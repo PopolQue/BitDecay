@@ -44,10 +44,40 @@ const (
 	CapacityLuxBungalow    = 8
 )
 
+// Action Points
+const (
+	MaxActionPoints = 3
+)
+
+// Asset Upgrade Costs
+const (
+	PriceUpgradeToGlamping = 150
+	PriceUpgradeToLuxus    = 1000
+)
+
+// Board Constants
+const (
+	MapRadius = 6
+	HexSize   = 40
+)
+
 // Resource Generation
 const (
 	GeneratorPowerOutput = 50
 	WaterTankOutput      = 50
 	InitialMoney         = 2000
 	InitialArea          = 200
+)
+
+// Events
+type EventEffect string
+
+const (
+	EffectNPCHalf         EventEffect = "NPCHalf"
+	EffectNPCDouble       EventEffect = "NPCDouble"
+	EffectNoTents         EventEffect = "NoTents"
+	EffectPreferTents     EventEffect = "PreferTents"
+	EffectExtraThirst     EventEffect = "ExtraThirst"
+	EffectNoWaterGen      EventEffect = "NoWaterGen"
+	EffectNoPowerGen      EventEffect = "NoPowerGen"
 )
