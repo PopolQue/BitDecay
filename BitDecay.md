@@ -1,5 +1,7 @@
 # Technical Design Document
-# BIT-DECAY // MNEMONIC_OVERRIDE_3.0
+
+## BIT-DECAY // MNEMONIC_OVERRIDE_3.0
+
 ## Implementation Stack: Go + Ebitengine
 
 > **Document Version:** 1.0  
@@ -32,22 +34,22 @@
 
 Ebitengine provides a single fixed-timestep loop via `Update()` + `Draw()`. Unlike Fyne's retained widget model, **all rendering is immediate-mode**: every frame redraws the screen from scratch by blitting images and drawing primitives onto `*ebiten.Image` targets. This gives total pixel-level control — ideal for the CRT glitch aesthetic.
 
-```
+``` Runtime
 ┌─────────────────────────────────────────────────────────────┐
 │                     EBITENGINE RUNTIME                      │
 │                                                             │
 │  ebiten.RunGame(game)                                       │
 │       │                                                     │
-│       ├── Update() — called @ 60 TPS (fixed)               │
+│       ├── Update() — called @ 60 TPS (fixed)                │
 │       │       ├── InputSystem.Poll()                        │
-│       │       ├── GameEngine.Tick() [every 6th → 100ms]    │
-│       │       │       ├── HardwareRegistry.Compute()       │
-│       │       │       ├── EntropyEngine.Step()             │
-│       │       │       └── DecayEngine.Step()               │
-│       │       ├── UIState.Animate()                        │
-│       │       └── GlitchSystem.Step()                      │
+│       │       ├── GameEngine.Tick() [every 6th → 100ms]     │
+│       │       │       ├── HardwareRegistry.Compute()        │
+│       │       │       ├── EntropyEngine.Step()              │
+│       │       │       └── DecayEngine.Step()                │
+│       │       ├── UIState.Animate()                         │
+│       │       └── GlitchSystem.Step()                       │
 │       │                                                     │
-│       └── Draw(*ebiten.Image) — called every frame         │
+│       └── Draw(*ebiten.Image) — called every frame          │
 │               ├── RenderBackground()                        │
 │               ├── RenderWaterfall()                         │
 │               ├── RenderHUD()                               │
@@ -60,7 +62,7 @@ Ebitengine provides a single fixed-timestep loop via `Update()` + `Draw()`. Unli
 ### Key Design Decisions — Why Ebitengine
 
 | Concern | Ebitengine Approach |
-|---|---|
+| --- | --- |
 | Full pixel control | Every frame drawn to `*ebiten.Image`; GPU-accelerated via OpenGL/Metal/DirectX |
 | CRT scanline & glitch | Custom shader (Kage) for phosphor bloom, scanlines, chromatic aberration |
 | Waterfall animation | Pixel-buffer written per-frame; no retained widget overhead |
@@ -71,7 +73,7 @@ Ebitengine provides a single fixed-timestep loop via `Update()` + `Draw()`. Unli
 
 ## 2. Project Structure
 
-```
+``` Filestructure
 bit-decay/
 ├── cmd/
 │   └── bitdecay/
@@ -235,7 +237,7 @@ type GameState struct {
 
 ### 4.2 Production & Entropy Formulas
 
-```
+``` formula
 bitsPerSec = Σ(hardware[id] × bps[id] × upgradeMult[id]) × GHzMultiplier × (1 − corruptPenalty)
 corruptPenalty = min(Corruption / 200.0, 0.5)
 
@@ -255,7 +257,7 @@ if Corruption > 75:
 
 Each frame, `renderer.Draw()` paints layers in order onto the `screen *ebiten.Image`:
 
-```
+``` UI Layers
 Layer 0 — Background grid (static, dark #000A00 fill + dim grid lines)
 Layer 1 — Waterfall (scrolling pixel buffer blitted as texture)
 Layer 2 — HUD panel (metrics text, progress bars drawn with vector rects)
@@ -451,7 +453,7 @@ var (
 ### 7.1 Thresholds
 
 | Corruption % | Visual Effect |
-|---|---|
+| --- | --- |
 | 0 – 49 | Clean render; standard green palette |
 | 50 – 74 | Subtle CRT flicker (shader `Time` uniform pulsed) |
 | 75 – 89 | Waterfall charset → glitch set; random pixel noise bands in HUD |
@@ -662,7 +664,7 @@ func drawRebootDialog(screen *ebiten.Image, state *model.GameState) {
 
 ### 10.3 GHz Reward Formula
 
-```
+``` formula
 gain          = log10(TotalBitsEarned / 1,000,000) × 0.1
 GHzMultiplier += gain
 ```
@@ -796,7 +798,7 @@ func loadCRTShader() (*ebiten.Shader, error) {
 ### 13.4 Minimum System Requirements
 
 | | Minimum |
-|---|---|
+| --- | --- |
 | OS | Windows 10 / macOS 11 / Ubuntu 20.04 |
 | RAM | 64 MB |
 | GPU | OpenGL 3.1 / Metal / DirectX 11 capable |
@@ -808,7 +810,7 @@ func loadCRTShader() (*ebiten.Shader, error) {
 ## 14. Risk Register
 
 | Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `WritePixels()` waterfall causes GC pressure | Medium | Frame drops | Pre-allocate `[]byte` pixel slice; avoid per-frame allocs |
 | Kage shader compile failure on older drivers | Low | No CRT effect | Fallback renderer skips shader pass; logs warning |
 | Map snapshot race during autosave | Medium | Corrupt save | Deep-clone maps before passing snapshot to goroutine |
@@ -818,4 +820,4 @@ func loadCRTShader() (*ebiten.Shader, error) {
 
 ---
 
-*End of Technical Design Document — BIT-DECAY // Go + Ebitengine*
+***End of Technical Design Document — BIT-DECAY // Go + Ebitengine***

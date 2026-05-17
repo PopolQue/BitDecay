@@ -1,17 +1,34 @@
 package model
 
-import "github.com/google/uuid"
-
 type GameState struct {
-	ID            uuid.UUID `json:"id"`
-	Bits          float64   `json:"bits"`
-	Entropy       float64   `json:"entropy"`
-	Corruption    float64   `json:"corruption"`
-	ClickerFlash  bool      `json:"-"` // UI state only
+	// Economy
+	Bits            float64
+	TotalBitsEarned float64
+
+	// System health
+	Entropy    float64 // 0.0 – 100.0
+	Corruption float64 // 0.0 – 100.0
+
+	// Prestige
+	GHzMultiplier float64
+	RebootCount   int
+
+	// Hardware owned
+	Hardware map[string]int
+	Upgrades map[string]bool
+
+	// UI animation signals (not persisted)
+	ClickerFlash  bool   // consumed by renderer
+	ScrollOffset  int    // hardware panel scroll position
+	RebootPending bool   // confirmation dialog visible
+	ActiveTab     string // "HARDWARE", "UPGRADES", "SYSTEM"
 }
 
 func NewGameState() *GameState {
 	return &GameState{
-		ID: uuid.New(),
+		GHzMultiplier: 1.0,
+		Hardware:      make(map[string]int),
+		Upgrades:      make(map[string]bool),
+		ActiveTab:     "HARDWARE",
 	}
 }
