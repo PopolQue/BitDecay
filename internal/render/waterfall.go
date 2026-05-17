@@ -6,45 +6,80 @@ import (
 	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/popolque/firstbitengi/internal/ui"
 )
 
 type MatrixColumn struct {
-	X       int
-	Y       float64
-	Height  int
-	Speed   float64
-	Symbols []string
+	X         int
+	Y         int
+	MaxHeight int
+	Symbols   []string
+	Life      int // Frames until it relocates
+}
+
+func NewMatrixColumn(x, y, maxHeight, life int) *MatrixColumn {
+	return &MatrixColumn{
+		X:         x,
+		Y:         y,
+		MaxHeight: maxHeight,
+		Life:      life,
+		Symbols:   make([]string, maxHeight),
+	}
 }
 
 type WaterfallRenderer struct {
 	columns   []*MatrixColumn
 	tick      int
 	offscreen *ebiten.Image
+	face      *text.GoTextFace
 }
 
 func NewWaterfallRenderer() *WaterfallRenderer {
-	return &WaterfallRenderer{
+	wr := &WaterfallRenderer{
 		offscreen: ebiten.NewImage(ui.ScreenWidth, ui.ScreenHeight),
 	}
+	if ui.MainFaceSource != nil {
+		wr.face = &text.GoTextFace{Source: ui.MainFaceSource, Size: 14}
+	}
+	return wr
 }
 
 func (w *WaterfallRenderer) Update(corruption float64) {
 	w.tick++
 
-	// Spawn new columns
-	if len(w.columns) < 60 && w.tick%5 == 0 { // Increased density and spawn rate
+	if w.face == nil && ui.MainFaceSource != nil {
+		w.face = &text.GoTextFace{Source: ui.MainFaceSource, Size: 14}
+	}
+
+	// Maintain a fixed number of columns
+	targetCount := 60
+	if len(w.columns) < targetCount {
 		w.spawnColumn(corruption)
+	}
+
+	charset := "01  "
+	if corruption > 75 {
+		charset = "01#@!?% "
 	}
 
 	// Update columns
 	for i := len(w.columns) - 1; i >= 0; i-- {
 		c := w.columns[i]
-		c.Y += c.Speed
+		c.Life--
 
-		// If column is completely off screen (below), remove it
-		if int(c.Y) > ui.ScreenHeight {
+		// Randomly change symbols without re-allocating slice
+		if w.tick%3 == 0 {
+			for j := 0; j < len(c.Symbols); j++ {
+				// Occasionally don't change to save some work/variation
+				if rand.Float64() > 0.2 {
+					c.Symbols[j] = string(charset[rand.Intn(len(charset))])
+				}
+			}
+		}
+
+		// If column life is over, remove it (it will respawn elsewhere)
+		if c.Life <= 0 {
 			w.columns = append(w.columns[:i], w.columns[i+1:]...)
 		}
 	}
@@ -52,40 +87,29 @@ func (w *WaterfallRenderer) Update(corruption float64) {
 
 func (w *WaterfallRenderer) spawnColumn(corruption float64) {
 	x := rand.Intn(ui.ScreenWidth)
-	speed := rand.Float64()*3 + 1 // Slightly faster
-	height := rand.Intn(15) + 5   // Slightly taller
-	
-	charset := "01  "
-	if corruption > 75 {
-		charset = "01#@!?% "
-	}
+	y := rand.Intn(ui.ScreenHeight)
+	maxHeight := rand.Intn(15) + 5
+	life := rand.Intn(100) + 50
 
-	symbols := make([]string, height)
-	for i := 0; i < height; i++ {
-		symbols[i] = string(charset[rand.Intn(len(charset))])
-	}
-
-	w.columns = append(w.columns, &MatrixColumn{
-		X:       x,
-		Y:       float64(-height * 14),
-		Height:  height,
-		Speed:   speed,
-		Symbols: symbols,
-	})
+	w.columns = append(w.columns, NewMatrixColumn(x, y, maxHeight, life))
 }
 
 func (w *WaterfallRenderer) Draw(screen *ebiten.Image) {
 	w.offscreen.Clear()
-	lineHeight := 14
+	lineHeight := 14.0
 
 	for _, c := range w.columns {
 		for i, sym := range c.Symbols {
-			y := int(c.Y) + i*lineHeight
-			
+			currY := float64(c.Y) + float64(i)*lineHeight
+
 			// Only draw if not inside the widget rect
-			pt := image.Pt(c.X, y)
-			if !pt.In(ui.WidgetRect) && y >= 0 && y < ui.ScreenHeight {
-				ebitenutil.DebugPrintAt(w.offscreen, sym, c.X, y)
+			pt := image.Pt(c.X, int(currY))
+			if !pt.In(ui.WidgetRect) && currY >= 0 && currY < float64(ui.ScreenHeight) {
+				if w.face != nil {
+					op := &text.DrawOptions{}
+					op.GeoM.Translate(float64(c.X), currY)
+					text.Draw(w.offscreen, sym, w.face, op)
+				}
 			}
 		}
 	}

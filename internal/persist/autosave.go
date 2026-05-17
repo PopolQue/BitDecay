@@ -1,6 +1,7 @@
 package persist
 
 import (
+	"log"
 	"time"
 
 	"github.com/popolque/firstbitengi/internal/model"
@@ -25,7 +26,9 @@ func NewAutosaver(path string, interval time.Duration) *Autosaver {
 func (a *Autosaver) Start() {
 	go func() {
 		for snap := range a.snapshotCh {
-			_ = Save(snap, a.path)
+			if err := Save(snap, a.path); err != nil {
+				log.Printf("autosave failed: %v\n", err)
+			}
 		}
 	}()
 }

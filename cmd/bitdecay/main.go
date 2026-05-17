@@ -11,6 +11,11 @@ import (
 func main() {
 	audio.Init()
 	audio.LoadSounds()
+	audio.StartLoop()
+
+	if err := engine.LoadAssets(); err != nil {
+		log.Fatal(err)
+	}
 
 	game := engine.NewGame()
 

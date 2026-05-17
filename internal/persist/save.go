@@ -25,5 +25,6 @@ func Load(path string) (*model.GameState, error) {
 	if err != nil {
 		return nil, err
 	}
+	state.Sanitize()
 	return &state, nil
 }

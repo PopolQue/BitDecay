@@ -2,11 +2,17 @@ package engine
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/popolque/firstbitengi/internal/audio"
 	"github.com/popolque/firstbitengi/internal/input"
 	"github.com/popolque/firstbitengi/internal/model"
 	"github.com/popolque/firstbitengi/internal/persist"
 	"github.com/popolque/firstbitengi/internal/render"
+	"github.com/popolque/firstbitengi/internal/ui"
 )
+
+func LoadAssets() error {
+	return ui.LoadFont("fonts/BPdotsLight.otf")
+}
 
 type Game struct {
 	engine   *GameEngine
@@ -30,6 +36,7 @@ func NewGame() *Game {
 }
 
 func (g *Game) Update() error {
+	audio.Update()
 	g.input.Poll()
 	g.engine.Update(g.input)
 	// g.uiState.Animate()

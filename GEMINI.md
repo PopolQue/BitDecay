@@ -48,6 +48,7 @@ GOOS=js GOARCH=wasm go build -o dist/bitdecay.wasm ./cmd/bitdecay
 - **Rendering:** All UI is custom-drawn using Ebitengine primitives; no external widget toolkits are used.
 - **State Management:** The `GameState` struct is the "canonical truth". Subsystems should read from it and only the `GameEngine` should modify it during `gameTick`.
 - **Concurrency:** Use deep-cloning for the game state before passing it to the `persist` package to avoid race conditions during background autosaves.
+- **Assets:** All fonts and sound effects are embedded into the binary using `//go:embed` via the `assets` package.
 - **Shaders:** Use `//go:embed` to include `.kage` files in the binary.
 
 ## Key Files

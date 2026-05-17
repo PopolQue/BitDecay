@@ -11,7 +11,7 @@ var (
 	WidgetWidth  = 900
 	WidgetHeight = 600
 	WidgetX      = (ScreenWidth - WidgetWidth) / 2
-	WidgetY      = (ScreenHeight - WidgetHeight) / 2 + 10
+	WidgetY      = (ScreenHeight - WidgetHeight) / 2 + 150
 	WidgetRect   = image.Rect(WidgetX, WidgetY, WidgetX+WidgetWidth, WidgetY+WidgetHeight)
 
 	// Tabs

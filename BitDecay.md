@@ -5,7 +5,7 @@
 ## Implementation Stack: Go + Ebitengine
 
 > **Document Version:** 1.0  
-> **Stack:** Go 1.22+ · Ebitengine v2.8+  
+> **Stack:** Go 1.24+ · Ebitengine v2.9+  
 > **Target Platforms:** Windows · macOS · Linux · (WebAssembly)  
 > **Document Status:** DRAFT
 
@@ -91,14 +91,7 @@ bit-decay/
 │   │   └── upgrade_def.go        # Upgrade tree
 │   ├── render/
 │   │   ├── renderer.go           # Top-level Draw() dispatcher
-│   │   ├── background.go         # Dark grid background
-│   │   ├── waterfall.go          # Scrolling code stream renderer
-│   │   ├── hud.go                # Metrics overlay (bits, entropy, corruption)
-│   │   ├── hardware_panel.go     # Scrollable buy-list renderer
-│   │   ├── click_button.go       # Animated clicker widget
-│   │   └── glitch_overlay.go     # Corruption-reactive post-process layer
-│   ├── shader/
-│   │   └── crt.kage              # Kage shader: scanlines + phosphor glow
+│   │   ├── crt.kage              # Kage shader: scanlines + phosphor glow
 │   ├── input/
 │   │   └── input.go              # Mouse + keyboard polling, click detection
 │   ├── ui/
@@ -111,13 +104,12 @@ bit-decay/
 │   └── format/
 │       └── bits.go               # Bit → Brontobyte formatter
 ├── assets/
+│   ├── assets.go                 # //go:embed for all assets
 │   ├── fonts/
-│   │   └── ShareTechMono.ttf
+│   │   └── BPdotsLight.otf
 │   └── sfx/
-│       ├── click.ogg
-│       └── alarm.ogg
-├── shader/
-│   └── crt.kage                  # Kage source (compiled at runtime)
+│       ├── BitDecayClick.wav
+│       └── BitDecayLoop.wav
 ├── config/
 │   └── balance.toml
 ├── save.json
@@ -373,13 +365,14 @@ func (r *HardwarePanelRenderer) Draw(screen *ebiten.Image, state *model.GameStat
 
 ### 5.5 Text Rendering
 
-Text is rendered using `github.com/hajimehoshi/ebiten/v2/text/v2` with a pre-loaded `text.GoTextFace` backed by `ShareTechMono.ttf`. A shared `FontCache` struct holds the parsed font and common sizes to avoid per-frame allocations.
+Text is rendered using `github.com/hajimehoshi/ebiten/v2/text/v2` with a pre-loaded `text.GoTextFace` backed by `BPdotsLight.otf`.
 
 ```go
 var termFace *text.GoTextFace
 
 func init() {
-    f, _ := os.ReadFile("assets/fonts/ShareTechMono.ttf")
+    // Loaded from embedded assets.FS
+    f, _ := assets.FS.ReadFile("fonts/BPdotsLight.otf")
     tt, _ := text.NewGoTextFaceSource(bytes.NewReader(f))
     termFace = &text.GoTextFace{Source: tt, Size: 14}
 }
@@ -690,20 +683,23 @@ func (p *PrestigeManager) Reboot(state *model.GameState) {
 
 ## 11. Audio
 
-Ebitengine uses `github.com/hajimehoshi/ebiten/v2/audio` with OGG/Vorbis decoding via `golang.org/x/image` (or `github.com/jfreymuth/oggvorbis`).
+Ebitengine uses `github.com/hajimehoshi/ebiten/v2/audio` with WAV decoding. All audio assets are embedded via the `assets` package.
 
 ```go
 // internal/audio/audio.go
 var (
     audioCtx    *audio.Context
     clickPlayer *audio.Player
+    loopPlayer  *audio.Player
     alarmPlayer *audio.Player
 )
 
 func Init() {
     audioCtx = audio.NewContext(44100)
-    clickPlayer  = loadOGG("assets/sfx/click.ogg")
-    alarmPlayer  = loadOGG("assets/sfx/alarm.ogg")
+    // Background loop uses audio.NewInfiniteLoop
+    loopPlayer   = loadWAV("sfx/BitDecayLoop.wav", true)
+    clickPlayer  = loadWAV("sfx/BitDecayClick.wav", false)
+    alarmPlayer  = loadWAV("sfx/BitDecayClick.wav", false) // Placeholder
 }
 
 func PlayClick() {
@@ -754,14 +750,12 @@ scanline_strength     = 0.15   # Kage shader uniform
 
 ```go
 // go.mod
-module bit-decay
+module github.com/popolque/firstbitengi
 
-go 1.22
+go 1.24.13
 
 require (
-    github.com/hajimehoshi/ebiten/v2 v2.8.0
-    github.com/BurntSushi/toml      v1.4.0
-    golang.org/x/image              v0.18.0
+    github.com/hajimehoshi/ebiten/v2 v2.9.9
 )
 ```
 
@@ -784,10 +778,12 @@ cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" dist/
 
 ### 13.3 Shader Embedding
 
-Kage shaders are embedded at compile time via Go's `//go:embed` directive:
+Kage shaders are embedded at compile time via Go's `//go:embed` directive within the rendering package:
 
 ```go
-//go:embed shader/crt.kage
+// internal/render/renderer.go
+
+//go:embed crt.kage
 var crtShaderSrc []byte
 
 func loadCRTShader() (*ebiten.Shader, error) {

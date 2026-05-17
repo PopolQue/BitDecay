@@ -1,17 +1,18 @@
 {
-  "Bits": 105.89724026239385,
-  "TotalBitsEarned": 449.39000000001363,
-  "Entropy": 19.82899999999916,
-  "Corruption": 0,
+  "Bits": 1487.3129160074477,
+  "TotalBitsEarned": 3290.879296152261,
+  "Entropy": 100,
+  "Corruption": 52.791630199998075,
   "GHzMultiplier": 1,
   "RebootCount": 0,
   "Hardware": {
-    "alu": 1,
-    "logic_gate": 11
+    "alu": 3,
+    "ecc_memory": 1,
+    "logic_gate": 22
   },
   "Upgrades": {},
   "ClickerFlash": false,
   "ScrollOffset": 0,
   "RebootPending": false,
-  "ActiveTab": "SYSTEM"
+  "ActiveTab": "HARDWARE"
 }

@@ -50,6 +50,7 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 		if in.Clicked {
 			rect := image.Rect(ui.WidgetX+50, ui.WidgetY+150, ui.WidgetX+ui.WidgetWidth-50, ui.WidgetY+ui.WidgetHeight-150)
 			if in.MousePos.In(rect) {
+				audio.PlayClick()
 				if in.MousePos.X < rect.Min.X+rect.Dx()/2 { // Confirm
 					ge.Reboot()
 				} else { // Abort
@@ -65,12 +66,15 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 		if in.MousePos.In(ui.Tab1Rect) {
 			ge.state.ActiveTab = "HARDWARE"
 			ge.state.ScrollOffset = 0
+			audio.PlayClick()
 		} else if in.MousePos.In(ui.Tab2Rect) {
 			ge.state.ActiveTab = "UPGRADES"
 			ge.state.ScrollOffset = 0
+			audio.PlayClick()
 		} else if in.MousePos.In(ui.Tab3Rect) {
 			ge.state.ActiveTab = "SYSTEM"
 			ge.state.ScrollOffset = 0
+			audio.PlayClick()
 		}
 
 		// Tab-specific logic
@@ -98,9 +102,11 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 				ge.state.Bits += ge.manualClickValue()
 				ge.state.TotalBitsEarned += ge.manualClickValue()
 				ge.state.ClickerFlash = true
+				audio.PlayClick()
 			}
 			if in.RebootTriggered() && ge.state.TotalBitsEarned >= 1_000_000 {
 				ge.state.RebootPending = true
+				audio.PlayClick()
 			}
 		}
 
@@ -116,6 +122,7 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 		ge.state.Bits += ge.manualClickValue()
 		ge.state.TotalBitsEarned += ge.manualClickValue()
 		ge.state.ClickerFlash = true
+		audio.PlayClick()
 	}
 }
 
@@ -158,6 +165,7 @@ func (ge *GameEngine) PurchaseHardware(id string) {
 	if ge.state.Bits >= cost {
 		ge.state.Bits -= cost
 		ge.state.Hardware[id]++
+		audio.PlayClick()
 	}
 }
 
@@ -179,6 +187,7 @@ func (ge *GameEngine) PurchaseUpgrade(id string) {
 	if ge.state.Bits >= target.Cost {
 		ge.state.Bits -= target.Cost
 		ge.state.Upgrades[id] = true
+		audio.PlayClick()
 	}
 }
 

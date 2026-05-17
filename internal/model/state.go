@@ -25,10 +25,22 @@ type GameState struct {
 }
 
 func NewGameState() *GameState {
-	return &GameState{
-		GHzMultiplier: 1.0,
-		Hardware:      make(map[string]int),
-		Upgrades:      make(map[string]bool),
-		ActiveTab:     "HARDWARE",
+	gs := &GameState{}
+	gs.Sanitize()
+	return gs
+}
+
+func (gs *GameState) Sanitize() {
+	if gs.GHzMultiplier == 0 {
+		gs.GHzMultiplier = 1.0
+	}
+	if gs.Hardware == nil {
+		gs.Hardware = make(map[string]int)
+	}
+	if gs.Upgrades == nil {
+		gs.Upgrades = make(map[string]bool)
+	}
+	if gs.ActiveTab == "" {
+		gs.ActiveTab = "HARDWARE"
 	}
 }

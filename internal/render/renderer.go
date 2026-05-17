@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"log"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/popolque/firstbitengi/internal/format"
 	"github.com/popolque/firstbitengi/internal/model"
 	"github.com/popolque/firstbitengi/internal/ui"
@@ -18,24 +20,35 @@ import (
 var crtShaderSrc []byte
 
 type Renderer struct {
-	waterfall *WaterfallRenderer
-	glitch    *GlitchSystem
-	crtShader *ebiten.Shader
-	offscreen *ebiten.Image
+	waterfall  *WaterfallRenderer
+	glitch     *GlitchSystem
+	crtShader  *ebiten.Shader
+	offscreen  *ebiten.Image
+	normalFace *text.GoTextFace
+	smallFace  *text.GoTextFace
+	largeFace  *text.GoTextFace
 }
 
 func NewRenderer() *Renderer {
 	s, err := ebiten.NewShader(crtShaderSrc)
 	if err != nil {
-		fmt.Printf("failed to load shader: %v\n", err)
+		log.Printf("failed to load shader: %v\n", err)
 	}
 
-	return &Renderer{
+	r := &Renderer{
 		waterfall: NewWaterfallRenderer(),
 		glitch:    NewGlitchSystem(),
 		crtShader: s,
 		offscreen: ebiten.NewImage(ui.ScreenWidth, ui.ScreenHeight),
 	}
+
+	if ui.MainFaceSource != nil {
+		r.normalFace = &text.GoTextFace{Source: ui.MainFaceSource, Size: 18}
+		r.smallFace = &text.GoTextFace{Source: ui.MainFaceSource, Size: 14}
+		r.largeFace = &text.GoTextFace{Source: ui.MainFaceSource, Size: 32}
+	}
+
+	return r
 }
 
 func (r *Renderer) Draw(screen *ebiten.Image, state *model.GameState) {
@@ -52,15 +65,24 @@ func (r *Renderer) Draw(screen *ebiten.Image, state *model.GameState) {
 	screen.DrawRectShader(ui.ScreenWidth, ui.ScreenHeight, r.crtShader, op)
 }
 
-const asciiHeader = `
-  ____  _____ _______        ____   _______ ____       __     __
- |  _ \|_   _|__   __|      |  __ \|  ____/ ____|   /\ \ \   / /
- | |_) | | |    | |         | |  | | |__ | |       /  \ \ \_/ / 
- |  _ <  | |    | |         | |  | |  __|| |      / /\ \ \   /  
- | |_) |_| |_   | |         | |__| | |___| |____ / ____ \ | |   
- |____/|_____|  |_|         |_____/|______\_____/_/    \_\|_|   
- 
- `
+const asciiHeader = `    
+    ____  ____________________  _______________  __  __
+   / __ )/  _/_  __/ ____/ __ \/ ____/ ____/   \ \ \/ /
+  / __  |/ /  / / / __/ / / / / __/ / /   / /| |  \  / 
+ / /_/ // /  / / / /___/ /_/ / /___/ /___/ ___ |  / /  
+/____/___/ /_/ /_____/_____/_____/\____/_/  |_| /_/   
+
+`
+
+func (r *Renderer) DrawText(screen *ebiten.Image, str string, x, y float64, face *text.GoTextFace, clr color.Color) {
+	if face == nil {
+		return
+	}
+	op := &text.DrawOptions{}
+	op.GeoM.Translate(x, y)
+	op.ColorScale.ScaleWithColor(clr)
+	text.Draw(screen, str, face, op)
+}
 
 func (r *Renderer) drawToImage(screen *ebiten.Image, state *model.GameState) {
 	// Update visual systems
@@ -84,20 +106,28 @@ func (r *Renderer) drawToImage(screen *ebiten.Image, state *model.GameState) {
 }
 
 func (r *Renderer) drawHeader(screen *ebiten.Image) {
-	lines := 8
-	charWidth := 6
-	headerWidth := 67 * charWidth
-	x := (ui.ScreenWidth - headerWidth) / 2
-	y := ui.WidgetY - (lines * 14) - 5
+	if r.normalFace == nil {
+		ebitenutil.DebugPrintAt(screen, "BIT-DECAY (FONT MISSING)", ui.ScreenWidth/2-60, 20)
+		return
+	}
 
-	// Draw to a temporary image to apply neon green color scale
-	tempImg := ebiten.NewImage(headerWidth+20, lines*14+10)
-	ebitenutil.DebugPrintAt(tempImg, asciiHeader, 0, 0)
+	// Manual height calculation because text.Measure seems unreliable for multi-line here
+	lineHeight := 22.0
+	lines := 5.0
+	totalH := lines * lineHeight
+	
+	w, _ := text.Measure(asciiHeader, r.normalFace, 0)
+	x := (float64(ui.ScreenWidth) - w) / 2
+	y := float64(ui.WidgetY) - totalH - 40 // More padding
 
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(float64(x), float64(y))
-	op.ColorScale.ScaleWithColor(color.RGBA{57, 255, 20, 255}) // Neon Green
-	screen.DrawImage(tempImg, op)
+	if y < 10 {
+		y = 10
+	}
+
+	// Draw black background to prevent matrix overlap
+	ebitenutil.DrawRect(screen, x-20, y-10, w+40, totalH+20, color.Black)
+
+	r.DrawText(screen, asciiHeader, x, y, r.normalFace, color.RGBA{57, 255, 20, 255})
 }
 
 func (r *Renderer) drawWidget(screen *ebiten.Image, state *model.GameState) {
@@ -140,77 +170,89 @@ func (r *Renderer) drawTabs(screen *ebiten.Image, state *model.GameState) {
 
 	for _, t := range tabs {
 		clr := color.RGBA{0, 100, 0, 255}
+		textClr := color.RGBA{0, 150, 0, 255}
 		if state.ActiveTab == t.name {
 			clr = color.RGBA{0, 255, 0, 255}
+			textClr = color.RGBA{0, 255, 0, 255}
 			// Fill active tab slightly
 			ebitenutil.DrawRect(screen, float64(t.rect.Min.X), float64(t.rect.Min.Y),
 				float64(t.rect.Dx()), float64(t.rect.Dy()), color.RGBA{0, 40, 0, 255})
 		}
 		r.drawRectBorder(screen, t.rect, clr)
-		ebitenutil.DebugPrintAt(screen, t.name, t.rect.Min.X+20, t.rect.Min.Y+12)
+		r.DrawText(screen, t.name, float64(t.rect.Min.X+20), float64(t.rect.Min.Y+10), r.smallFace, textClr)
 	}
 }
 
 func (r *Renderer) drawHUD(screen *ebiten.Image, state *model.GameState) {
 	r.drawRectBorder(screen, ui.MetricsHUDRect, color.RGBA{0, 80, 0, 255})
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("BITS: %s", format.FormatBits(state.Bits)), ui.MetricsHUDRect.Min.X+10, ui.MetricsHUDRect.Min.Y+10)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("TOTAL: %s", format.FormatBits(state.TotalBitsEarned)), ui.MetricsHUDRect.Min.X+10, ui.MetricsHUDRect.Min.Y+30)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("ENTROPY: %.1f%%", state.Entropy), ui.MetricsHUDRect.Min.X+10, ui.MetricsHUDRect.Min.Y+50)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("CORRUPTION: %.1f%%", state.Corruption), ui.MetricsHUDRect.Min.X+10, ui.MetricsHUDRect.Min.Y+70)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("GHz MULT: %.3fX", state.GHzMultiplier), ui.MetricsHUDRect.Min.X+250, ui.MetricsHUDRect.Min.Y+10)
+	green := color.RGBA{0, 200, 0, 255}
+	r.DrawText(screen, fmt.Sprintf("BITS: %s", format.FormatBits(state.Bits)), float64(ui.MetricsHUDRect.Min.X+10), float64(ui.MetricsHUDRect.Min.Y+10), r.normalFace, green)
+	r.DrawText(screen, fmt.Sprintf("TOTAL: %s", format.FormatBits(state.TotalBitsEarned)), float64(ui.MetricsHUDRect.Min.X+10), float64(ui.MetricsHUDRect.Min.Y+40), r.smallFace, green)
+	r.DrawText(screen, fmt.Sprintf("ENTROPY: %.1f%%", state.Entropy), float64(ui.MetricsHUDRect.Min.X+10), float64(ui.MetricsHUDRect.Min.Y+65), r.smallFace, green)
+	r.DrawText(screen, fmt.Sprintf("CORRUPTION: %.1f%%", state.Corruption), float64(ui.MetricsHUDRect.Min.X+10), float64(ui.MetricsHUDRect.Min.Y+85), r.smallFace, green)
+	r.DrawText(screen, fmt.Sprintf("GHz MULT: %.3fX", state.GHzMultiplier), float64(ui.MetricsHUDRect.Min.X+300), float64(ui.MetricsHUDRect.Min.Y+10), r.normalFace, green)
 }
 
 func (r *Renderer) drawHardwareList(screen *ebiten.Image, state *model.GameState) {
-	x := ui.ListRect.Min.X + 10
-	startY := ui.ListRect.Min.Y + 10
-	rowHeight := 60
+	x := float64(ui.ListRect.Min.X + 10)
+	startY := float64(ui.ListRect.Min.Y + 10)
+	rowHeight := 60.0
+	green := color.RGBA{0, 180, 0, 255}
+	brightGreen := color.RGBA{0, 255, 0, 255}
 
 	for i, def := range model.AllHardware {
-		y := startY + i*rowHeight - state.ScrollOffset
-		if y < ui.ListRect.Min.Y || y > ui.ListRect.Max.Y-rowHeight {
+		y := startY + float64(i)*rowHeight - float64(state.ScrollOffset)
+		if y < float64(ui.ListRect.Min.Y) || y > float64(ui.ListRect.Max.Y-int(rowHeight)) {
 			continue
 		}
 
 		owned := state.Hardware[def.ID]
 		cost := model.CurrentCost(def, owned)
 
+		clr := green
 		status := "[ ]"
 		if state.Bits >= cost {
 			status = "[!]"
+			clr = brightGreen
 		}
 
 		label := fmt.Sprintf("%s %s (Owned: %d) - Cost: %s", status, def.Name, owned, format.FormatBits(cost))
-		ebitenutil.DebugPrintAt(screen, label, x, y)
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("  BPS: %.1f | Entropy: %.2f", def.BaseBPS, def.EntropyWeight), x, y+20)
+		r.DrawText(screen, label, x, y, r.smallFace, clr)
+		r.DrawText(screen, fmt.Sprintf("  BPS: %.1f | Entropy: %.2f", def.BaseBPS, def.EntropyWeight), x, y+20, r.smallFace, green)
 	}
 }
 
 func (r *Renderer) drawUpgradeList(screen *ebiten.Image, state *model.GameState) {
-	x := ui.ListRect.Min.X + 10
-	startY := ui.ListRect.Min.Y + 10
-	rowHeight := 60
+	x := float64(ui.ListRect.Min.X + 10)
+	startY := float64(ui.ListRect.Min.Y + 10)
+	rowHeight := 60.0
+	green := color.RGBA{0, 180, 0, 255}
+	brightGreen := color.RGBA{0, 255, 0, 255}
+	purchasedClr := color.RGBA{0, 100, 0, 255}
 
 	for i, def := range model.AllUpgrades {
-		y := startY + i*rowHeight - state.ScrollOffset
-		if y < ui.ListRect.Min.Y || y > ui.ListRect.Max.Y-rowHeight {
+		y := startY + float64(i)*rowHeight - float64(state.ScrollOffset)
+		if y < float64(ui.ListRect.Min.Y) || y > float64(ui.ListRect.Max.Y-int(rowHeight)) {
 			continue
 		}
 
 		owned := state.Upgrades[def.ID]
 		if owned {
-			ebitenutil.DebugPrintAt(screen, fmt.Sprintf("[X] %s (PURCHASED)", def.Name), x, y)
-			ebitenutil.DebugPrintAt(screen, "  "+def.Description, x, y+20)
+			r.DrawText(screen, fmt.Sprintf("[X] %s (PURCHASED)", def.Name), x, y, r.smallFace, purchasedClr)
+			r.DrawText(screen, "  "+def.Description, x, y+20, r.smallFace, purchasedClr)
 			continue
 		}
 
+		clr := green
 		status := "[ ]"
 		if state.Bits >= def.Cost {
 			status = "[*]"
+			clr = brightGreen
 		}
 
 		label := fmt.Sprintf("%s %s - Cost: %s", status, def.Name, format.FormatBits(def.Cost))
-		ebitenutil.DebugPrintAt(screen, label, x, y)
-		ebitenutil.DebugPrintAt(screen, "  "+def.Description, x, y+20)
+		r.DrawText(screen, label, x, y, r.smallFace, clr)
+		r.DrawText(screen, "  "+def.Description, x, y+20, r.smallFace, green)
 	}
 }
 
@@ -221,7 +263,7 @@ func (r *Renderer) drawSystemTab(screen *ebiten.Image, state *model.GameState) {
 		clickerColor = color.RGBA{100, 255, 100, 255}
 	}
 	r.drawRectBorder(screen, ui.ClickerRegion, clickerColor)
-	ebitenutil.DebugPrintAt(screen, "MANUAL OVERRIDE (CLICK)", ui.ClickerRegion.Min.X+30, ui.ClickerRegion.Min.Y+30)
+	r.DrawText(screen, "MANUAL OVERRIDE", float64(ui.ClickerRegion.Min.X+30), float64(ui.ClickerRegion.Min.Y+30), r.normalFace, clickerColor)
 
 	// Reboot Button
 	rebootColor := color.RGBA{0, 100, 0, 255}
@@ -229,7 +271,7 @@ func (r *Renderer) drawSystemTab(screen *ebiten.Image, state *model.GameState) {
 		rebootColor = color.RGBA{0, 255, 0, 255}
 	}
 	r.drawRectBorder(screen, ui.RebootBtnRect, rebootColor)
-	ebitenutil.DebugPrintAt(screen, "SYSTEM_REBOOT", ui.RebootBtnRect.Min.X+ui.RebootBtnRect.Dx()/2-50, ui.RebootBtnRect.Min.Y+12)
+	r.DrawText(screen, "SYSTEM_REBOOT", float64(ui.RebootBtnRect.Min.X+ui.RebootBtnRect.Dx()/2-80), float64(ui.RebootBtnRect.Min.Y+12), r.normalFace, rebootColor)
 }
 
 func (r *Renderer) drawRebootDialog(screen *ebiten.Image, state *model.GameState) {
@@ -242,10 +284,11 @@ func (r *Renderer) drawRebootDialog(screen *ebiten.Image, state *model.GameState
 		gain = 0
 	}
 
-	ebitenutil.DebugPrintAt(screen, ">> SYSTEM_REBOOT INITIATED <<", rect.Min.X+250, rect.Min.Y+50)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("GHz GAIN: +%.3fX", gain), rect.Min.X+250, rect.Min.Y+100)
-	ebitenutil.DebugPrintAt(screen, "ALL HARDWARE AND BITS WILL BE WIPED.", rect.Min.X+250, rect.Min.Y+150)
-	ebitenutil.DebugPrintAt(screen, "[CONFIRM (Left)]    [ABORT (Right)]", rect.Min.X+250, rect.Min.Y+220)
+	green := color.RGBA{0, 255, 0, 255}
+	r.DrawText(screen, ">> SYSTEM_REBOOT INITIATED <<", float64(rect.Min.X+200), float64(rect.Min.Y+50), r.normalFace, green)
+	r.DrawText(screen, fmt.Sprintf("GHz GAIN: +%.3fX", gain), float64(rect.Min.X+200), float64(rect.Min.Y+100), r.normalFace, green)
+	r.DrawText(screen, "ALL HARDWARE AND BITS WILL BE WIPED.", float64(rect.Min.X+200), float64(rect.Min.Y+150), r.smallFace, green)
+	r.DrawText(screen, "[CONFIRM (Left)]    [ABORT (Right)]", float64(rect.Min.X+200), float64(rect.Min.Y+220), r.normalFace, green)
 }
 
 func (r *Renderer) drawRectBorder(screen *ebiten.Image, rect image.Rectangle, clr color.Color) {
