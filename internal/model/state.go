@@ -85,6 +85,6 @@ func (gs *GameState) GetRank() string {
 
 func (gs *GameState) GetRebootThreshold() float64 {
 	base := 10000.0
-	scaling := 5.0 // Threshold increases by 5x each reboot
+	scaling := 1.5 // Threshold increases by 1.5x each reboot
 	return base * math.Pow(scaling, float64(gs.RebootCount))
 }

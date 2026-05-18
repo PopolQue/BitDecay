@@ -48,6 +48,16 @@ func (ge *GameEngine) Update(in *input.InputSystem) {
 
 func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 	if ge.state.RebootPending {
+		if in.YPressed {
+			audio.PlayClick()
+			ge.Reboot()
+			return
+		}
+		if in.NPressed {
+			audio.PlayClick()
+			ge.state.RebootPending = false
+			return
+		}
 		if in.Clicked {
 			rect := image.Rect(ui.WidgetX+100, ui.WidgetY+100, ui.WidgetX+ui.WidgetWidth-100, ui.WidgetY+ui.WidgetHeight-100)
 			if in.MousePos.In(rect) {
@@ -97,11 +107,6 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 			}
 		}
 
-		if in.MousePos.In(ui.RebootBtnRect) && ge.state.TotalBitsEarned >= ge.state.GetRebootThreshold() {
-			ge.state.RebootPending = true
-			audio.PlayClick()
-		}
-
 		// Global scroll for lists
 		if in.MousePos.In(ui.HardwareListRect) || in.MousePos.In(ui.UpgradeListRect) {
 			ge.state.ScrollOffset -= in.ScrollDelta * 20
@@ -111,6 +116,11 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 		}
 	} else if in.ClickerPressed() {
 		ge.PerformManualClick()
+	}
+
+	if in.RebootTriggered() && ge.state.TotalBitsEarned >= ge.state.GetRebootThreshold() {
+		ge.state.RebootPending = true
+		audio.PlayClick()
 	}
 }
 
@@ -123,7 +133,7 @@ func (ge *GameEngine) PerformManualClick() {
 
 func (ge *GameEngine) Reboot() {
 	threshold := ge.state.GetRebootThreshold()
-	gain := math.Log10(ge.state.TotalBitsEarned/threshold+1.0) * 0.1
+	gain := math.Log10(ge.state.TotalBitsEarned/threshold) 
 	if ge.state.RebootCount == 0 {
 		gain += 0.1 // Base boost for first reboot
 	}

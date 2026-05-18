@@ -3,14 +3,12 @@
     {
       "name": "Default",
       "files": [
-        "internal/engine/gameengine.go",
-        "internal/render/renderer.go",
-        "internal/ui/layout.go",
         "internal/model/state.go",
-        ".vscode/changelists.json",
         "cmd/bitdecay/save.json",
-        "internal/render/waterfall.go",
-        "internal/model/hardware_def.go"
+        ".vscode/changelists.json",
+        "internal/engine/gameengine.go",
+        "internal/input/input.go",
+        "internal/render/renderer.go"
       ]
     }
   ],

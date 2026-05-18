@@ -13,6 +13,8 @@ type InputSystem struct {
 	Clicked       bool // left mouse button just pressed
 	ScrollDelta   int  // mouse wheel delta this frame
 	RebootPressed bool // keyboard R or REBOOT button clicked
+	YPressed      bool // keyboard Y
+	NPressed      bool // keyboard N
 }
 
 func NewInputSystem() *InputSystem {
@@ -26,6 +28,8 @@ func (in *InputSystem) Poll() {
 	_, wy := ebiten.Wheel()
 	in.ScrollDelta = int(wy)
 	in.RebootPressed = inpututil.IsKeyJustPressed(ebiten.KeyR)
+	in.YPressed = inpututil.IsKeyJustPressed(ebiten.KeyY)
+	in.NPressed = inpututil.IsKeyJustPressed(ebiten.KeyN)
 }
 
 // Hit-testing helpers used by engine

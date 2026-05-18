@@ -273,7 +273,7 @@ func (r *Renderer) drawRebootDialog(screen *ebiten.Image, state *model.GameState
 	r.drawRectBorder(screen, rect, neonGreen)
 
 	threshold := state.GetRebootThreshold()
-	gain := math.Log10(state.TotalBitsEarned/threshold+1.0) * 0.1
+	gain := math.Log10(state.TotalBitsEarned/threshold)
 	if state.RebootCount == 0 {
 		gain += 0.1
 	}
