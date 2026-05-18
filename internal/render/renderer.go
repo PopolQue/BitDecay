@@ -65,230 +65,195 @@ func (r *Renderer) Draw(screen *ebiten.Image, state *model.GameState) {
 	screen.DrawRectShader(ui.ScreenWidth, ui.ScreenHeight, r.crtShader, op)
 }
 
-const asciiHeader = `    
-    ____  ____________________  _______________  __  __
-   / __ )/  _/_  __/ ____/ __ \/ ____/ ____/   \ \ \/ /
-  / __  |/ /  / / / __/ / / / / __/ / /   / /| |  \  / 
- / /_/ // /  / / / /___/ /_/ / /___/ /___/ ___ |  / /  
-/____/___/ /_/ /_____/_____/_____/\____/_/  |_| /_/   
+const asciiHeader = `
+  ____  _____ _______        ____   _______ ____       __     __
+ |  _ \|_   _|__   __|      |  __ \|  ____/ ____|   /\ \ \   / /
+ | |_) | | |    | |         | |  | | |__ | |       /  \ \ \_/ / 
+ |  _ <  | |    | |         | |  | |  __|| |      / /\ \ \   /  
+ | |_) |_| |_   | |         | |__| | |___| |____ / ____ \ | |   
+ |____/|_____|  |_|         |_____/|______\_____/_/    \_\|_|   
+ 
+ `
 
-`
-
-func (r *Renderer) DrawText(screen *ebiten.Image, str string, x, y float64, face *text.GoTextFace, clr color.Color) {
-	if face == nil {
-		return
-	}
-	op := &text.DrawOptions{}
-	op.GeoM.Translate(x, y)
-	op.ColorScale.ScaleWithColor(clr)
-	text.Draw(screen, str, face, op)
+func (r *Renderer) DrawText(screen *ebiten.Image, str string, x, y int, clr color.Color) {
+	ebitenutil.DebugPrintAt(screen, str, x, y)
 }
 
 func (r *Renderer) drawToImage(screen *ebiten.Image, state *model.GameState) {
-	// Update visual systems
 	r.waterfall.Update(state.Corruption)
 	r.glitch.Step(state.Corruption)
 
-	// Draw background
-	screen.Fill(color.RGBA{0, 5, 0, 255})
-
-	// Draw matrix around the widget
+	screen.Fill(color.Black)
 	r.waterfall.Draw(screen)
-
-	// ASCII Header
 	r.drawHeader(screen)
-
-	// Central Widget
 	r.drawWidget(screen, state)
-
-	// Glitch Overlay
 	r.glitch.Draw(screen)
 }
 
 func (r *Renderer) drawHeader(screen *ebiten.Image) {
-	if r.normalFace == nil {
-		ebitenutil.DebugPrintAt(screen, "BIT-DECAY (FONT MISSING)", ui.ScreenWidth/2-60, 20)
-		return
-	}
-
-	// Manual height calculation because text.Measure seems unreliable for multi-line here
-	lineHeight := 22.0
-	lines := 5.0
-	totalH := lines * lineHeight
-	
-	w, _ := text.Measure(asciiHeader, r.normalFace, 0)
-	x := (float64(ui.ScreenWidth) - w) / 2
-	y := float64(ui.WidgetY) - totalH - 40 // More padding
+	lines := 8
+	charWidth := 6
+	headerWidth := 67 * charWidth
+	x := (ui.ScreenWidth - headerWidth) / 2
+	y := ui.WidgetY - (lines * 14) - 20
 
 	if y < 10 {
 		y = 10
 	}
 
-	// Draw black background to prevent matrix overlap
-	ebitenutil.DrawRect(screen, x-20, y-10, w+40, totalH+20, color.Black)
+	ebitenutil.DrawRect(screen, float64(x-20), float64(y-10), float64(headerWidth+40), float64(lines*14+20), color.Black)
 
-	r.DrawText(screen, asciiHeader, x, y, r.normalFace, color.RGBA{57, 255, 20, 255})
+	tempImg := ebiten.NewImage(headerWidth+20, lines*14+20)
+	ebitenutil.DebugPrint(tempImg, asciiHeader)
+	
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(float64(x), float64(y))
+	op.ColorScale.ScaleWithColor(color.RGBA{57, 255, 20, 255})
+	screen.DrawImage(tempImg, op)
 }
 
 func (r *Renderer) drawWidget(screen *ebiten.Image, state *model.GameState) {
-	// Widget Background (darker than screen)
+	neonGreen := color.RGBA{57, 255, 20, 255}
+	bgGreen := color.RGBA{0, 20, 0, 240}
+
 	ebitenutil.DrawRect(screen, float64(ui.WidgetRect.Min.X), float64(ui.WidgetRect.Min.Y),
-		float64(ui.WidgetRect.Dx()), float64(ui.WidgetRect.Dy()), color.RGBA{0, 15, 0, 240})
-	r.drawRectBorder(screen, ui.WidgetRect, color.RGBA{0, 150, 0, 255})
+		float64(ui.WidgetRect.Dx()), float64(ui.WidgetRect.Dy()), bgGreen)
+	r.drawRectBorder(screen, ui.WidgetRect, neonGreen)
 
-	// Tabs
-	r.drawTabs(screen, state)
-
-	// HUD (Always visible in content area?)
 	r.drawHUD(screen, state)
+	r.drawHardwareList(screen, state)
+	r.drawSystemLog(screen, state)
+	r.drawClicker(screen, state, neonGreen)
+	r.drawReboot(screen, state, neonGreen)
 
-	// Content based on ActiveTab
-	switch state.ActiveTab {
-	case "HARDWARE":
-		r.drawHardwareList(screen, state)
-	case "UPGRADES":
-		r.drawUpgradeList(screen, state)
-	case "SYSTEM":
-		r.drawSystemTab(screen, state)
+	if state.PacketActive {
+		r.drawPacketIntercept(screen, state, neonGreen)
 	}
 
-	// Reboot Dialog (Overlays everything in widget)
 	if state.RebootPending {
-		r.drawRebootDialog(screen, state)
-	}
-}
-
-func (r *Renderer) drawTabs(screen *ebiten.Image, state *model.GameState) {
-	tabs := []struct {
-		rect image.Rectangle
-		name string
-	}{
-		{ui.Tab1Rect, "HARDWARE"},
-		{ui.Tab2Rect, "UPGRADES"},
-		{ui.Tab3Rect, "SYSTEM"},
-	}
-
-	for _, t := range tabs {
-		clr := color.RGBA{0, 100, 0, 255}
-		textClr := color.RGBA{0, 150, 0, 255}
-		if state.ActiveTab == t.name {
-			clr = color.RGBA{0, 255, 0, 255}
-			textClr = color.RGBA{0, 255, 0, 255}
-			// Fill active tab slightly
-			ebitenutil.DrawRect(screen, float64(t.rect.Min.X), float64(t.rect.Min.Y),
-				float64(t.rect.Dx()), float64(t.rect.Dy()), color.RGBA{0, 40, 0, 255})
-		}
-		r.drawRectBorder(screen, t.rect, clr)
-		r.DrawText(screen, t.name, float64(t.rect.Min.X+20), float64(t.rect.Min.Y+10), r.smallFace, textClr)
+		r.drawRebootDialog(screen, state, neonGreen)
 	}
 }
 
 func (r *Renderer) drawHUD(screen *ebiten.Image, state *model.GameState) {
-	r.drawRectBorder(screen, ui.MetricsHUDRect, color.RGBA{0, 80, 0, 255})
-	green := color.RGBA{0, 200, 0, 255}
-	r.DrawText(screen, fmt.Sprintf("BITS: %s", format.FormatBits(state.Bits)), float64(ui.MetricsHUDRect.Min.X+10), float64(ui.MetricsHUDRect.Min.Y+10), r.normalFace, green)
-	r.DrawText(screen, fmt.Sprintf("TOTAL: %s", format.FormatBits(state.TotalBitsEarned)), float64(ui.MetricsHUDRect.Min.X+10), float64(ui.MetricsHUDRect.Min.Y+40), r.smallFace, green)
-	r.DrawText(screen, fmt.Sprintf("ENTROPY: %.1f%%", state.Entropy), float64(ui.MetricsHUDRect.Min.X+10), float64(ui.MetricsHUDRect.Min.Y+65), r.smallFace, green)
-	r.DrawText(screen, fmt.Sprintf("CORRUPTION: %.1f%%", state.Corruption), float64(ui.MetricsHUDRect.Min.X+10), float64(ui.MetricsHUDRect.Min.Y+85), r.smallFace, green)
-	r.DrawText(screen, fmt.Sprintf("GHz MULT: %.3fX", state.GHzMultiplier), float64(ui.MetricsHUDRect.Min.X+300), float64(ui.MetricsHUDRect.Min.Y+10), r.normalFace, green)
+	r.drawRectBorder(screen, ui.MetricsHUDRect, color.RGBA{0, 200, 0, 255})
+	
+	// Column 1: Economy
+	r.DrawText(screen, fmt.Sprintf("BITS: %s", format.FormatBits(state.Bits)), ui.MetricsHUDRect.Min.X+20, ui.MetricsHUDRect.Min.Y+15, color.White)
+	r.DrawText(screen, fmt.Sprintf("TOTAL: %s", format.FormatBits(state.TotalBitsEarned)), ui.MetricsHUDRect.Min.X+20, ui.MetricsHUDRect.Min.Y+40, color.White)
+	r.DrawText(screen, fmt.Sprintf("RANK: %s", state.GetRank()), ui.MetricsHUDRect.Min.X+20, ui.MetricsHUDRect.Min.Y+65, color.White)
+	r.DrawText(screen, fmt.Sprintf("GHz MULT: %.3fX", state.GHzMultiplier), ui.MetricsHUDRect.Min.X+20, ui.MetricsHUDRect.Min.Y+90, color.White)
+
+	// Column 2: Infrastructure
+	startX := ui.MetricsHUDRect.Min.X + 350
+	r.DrawText(screen, fmt.Sprintf("POWER: %.0fW / %.0fW", state.PowerUsage, state.PowerCapacity), startX, ui.MetricsHUDRect.Min.Y+15, color.White)
+	r.drawProgressBar(screen, startX, ui.MetricsHUDRect.Min.Y+30, 250, 8, state.PowerUsage/state.PowerCapacity, color.RGBA{200, 200, 0, 255})
+
+	r.DrawText(screen, fmt.Sprintf("THERMAL: %.1fC", state.HeatLevel), startX, ui.MetricsHUDRect.Min.Y+50, color.White)
+	thermalClr := color.RGBA{0, 255, 0, 255}
+	if state.HeatLevel > 80 { thermalClr = color.RGBA{255, 0, 0, 255} }
+	r.drawProgressBar(screen, startX, ui.MetricsHUDRect.Min.Y+65, 250, 8, state.HeatLevel/100.0, thermalClr)
+
+	r.DrawText(screen, fmt.Sprintf("RACK SPACE: %.0fU / %.0fU", state.SpaceUsage, state.SpaceCapacity), startX, ui.MetricsHUDRect.Min.Y+85, color.White)
+	r.drawProgressBar(screen, startX, ui.MetricsHUDRect.Min.Y+100, 250, 8, state.SpaceUsage/state.SpaceCapacity, color.RGBA{0, 200, 255, 255})
+
+	// Column 3: System Health
+	startX2 := ui.MetricsHUDRect.Min.X + 650
+	r.DrawText(screen, fmt.Sprintf("ENTROPY: %.1f%%", state.Entropy), startX2, ui.MetricsHUDRect.Min.Y+15, color.White)
+	r.drawProgressBar(screen, startX2, ui.MetricsHUDRect.Min.Y+30, 250, 8, state.Entropy/100.0, color.RGBA{255, 165, 0, 255})
+
+	r.DrawText(screen, fmt.Sprintf("CORRUPTION: %.1f%%", state.Corruption), startX2, ui.MetricsHUDRect.Min.Y+50, color.White)
+	r.drawProgressBar(screen, startX2, ui.MetricsHUDRect.Min.Y+65, 250, 8, state.Corruption/100.0, color.RGBA{255, 0, 255, 255})
+}
+
+func (r *Renderer) drawProgressBar(screen *ebiten.Image, x, y, w, h int, ratio float64, clr color.Color) {
+	if ratio > 1.0 { ratio = 1.0 }
+	if ratio < 0 { ratio = 0 }
+	// Background
+	ebitenutil.DrawRect(screen, float64(x), float64(y), float64(w), float64(h), color.RGBA{0, 50, 0, 255})
+	// Fill
+	ebitenutil.DrawRect(screen, float64(x), float64(y), float64(w)*ratio, float64(h), clr)
+	// Border
+	r.drawRectBorder(screen, image.Rect(x, y, x+w, y+h), color.RGBA{0, 100, 0, 255})
+}
+
+func (r *Renderer) drawClicker(screen *ebiten.Image, state *model.GameState, neonGreen color.Color) {
+	clr := neonGreen
+	if state.ClickerFlash { clr = color.White }
+	r.drawRectBorder(screen, ui.ClickerRegion, clr)
+	r.DrawText(screen, "MANUAL OVERRIDE", ui.ClickerRegion.Min.X+80, ui.ClickerRegion.Min.Y+60, color.White)
 }
 
 func (r *Renderer) drawHardwareList(screen *ebiten.Image, state *model.GameState) {
-	x := float64(ui.ListRect.Min.X + 10)
-	startY := float64(ui.ListRect.Min.Y + 10)
-	rowHeight := 60.0
-	green := color.RGBA{0, 180, 0, 255}
-	brightGreen := color.RGBA{0, 255, 0, 255}
+	r.drawRectBorder(screen, ui.ListRect, color.RGBA{0, 200, 0, 255})
+	
+	x := ui.ListRect.Min.X + 20
+	startY := ui.ListRect.Min.Y + 20
+	rowHeight := 60
 
 	for i, def := range model.AllHardware {
-		y := startY + float64(i)*rowHeight - float64(state.ScrollOffset)
-		if y < float64(ui.ListRect.Min.Y) || y > float64(ui.ListRect.Max.Y-int(rowHeight)) {
+		y := startY + i*rowHeight - state.ScrollOffset
+		if y < ui.ListRect.Min.Y+10 || y > ui.ListRect.Max.Y-rowHeight {
 			continue
 		}
 
 		owned := state.Hardware[def.ID]
 		cost := model.CurrentCost(def, owned)
 
-		clr := green
 		status := "[ ]"
-		if state.Bits >= cost {
-			status = "[!]"
-			clr = brightGreen
-		}
+		if state.Bits >= cost { status = "[!]" }
 
-		label := fmt.Sprintf("%s %s (Owned: %d) - Cost: %s", status, def.Name, owned, format.FormatBits(cost))
-		r.DrawText(screen, label, x, y, r.smallFace, clr)
-		r.DrawText(screen, fmt.Sprintf("  BPS: %.1f | Entropy: %.2f", def.BaseBPS, def.EntropyWeight), x, y+20, r.smallFace, green)
+		label := fmt.Sprintf("%s %s (x%d) - %s", status, def.Name, owned, format.FormatBits(cost))
+		r.DrawText(screen, label, x, y, color.White)
+		
+		// Infrastructure info
+		infra := ""
+		if def.WattsImpact != 0 { infra += fmt.Sprintf("%.0fW ", def.WattsImpact) }
+		if def.ThermalImpact != 0 { infra += fmt.Sprintf("%.0fC ", def.ThermalImpact) }
+		if def.SpaceImpact != 0 { infra += fmt.Sprintf("%.0fU ", def.SpaceImpact) }
+		
+		r.DrawText(screen, fmt.Sprintf("  BPS: %.1f | %s", def.BaseBPS, infra), x, y+20, color.White)
+		r.DrawText(screen, "  "+def.Description, x, y+40, color.RGBA{0, 180, 0, 255})
 	}
 }
 
-func (r *Renderer) drawUpgradeList(screen *ebiten.Image, state *model.GameState) {
-	x := float64(ui.ListRect.Min.X + 10)
-	startY := float64(ui.ListRect.Min.Y + 10)
-	rowHeight := 60.0
-	green := color.RGBA{0, 180, 0, 255}
-	brightGreen := color.RGBA{0, 255, 0, 255}
-	purchasedClr := color.RGBA{0, 100, 0, 255}
+func (r *Renderer) drawSystemLog(screen *ebiten.Image, state *model.GameState) {
+	r.drawRectBorder(screen, ui.LogRect, color.RGBA{0, 200, 0, 255})
+	r.DrawText(screen, "[ LOG ]", ui.LogRect.Min.X+10, ui.LogRect.Min.Y-20, color.White)
 
-	for i, def := range model.AllUpgrades {
-		y := startY + float64(i)*rowHeight - float64(state.ScrollOffset)
-		if y < float64(ui.ListRect.Min.Y) || y > float64(ui.ListRect.Max.Y-int(rowHeight)) {
-			continue
-		}
-
-		owned := state.Upgrades[def.ID]
-		if owned {
-			r.DrawText(screen, fmt.Sprintf("[X] %s (PURCHASED)", def.Name), x, y, r.smallFace, purchasedClr)
-			r.DrawText(screen, "  "+def.Description, x, y+20, r.smallFace, purchasedClr)
-			continue
-		}
-
-		clr := green
-		status := "[ ]"
-		if state.Bits >= def.Cost {
-			status = "[*]"
-			clr = brightGreen
-		}
-
-		label := fmt.Sprintf("%s %s - Cost: %s", status, def.Name, format.FormatBits(def.Cost))
-		r.DrawText(screen, label, x, y, r.smallFace, clr)
-		r.DrawText(screen, "  "+def.Description, x, y+20, r.smallFace, green)
+	logX := ui.LogRect.Min.X + 10
+	logY := ui.LogRect.Min.Y + 10
+	lineHeight := 18
+	for i, msg := range state.MessageLog {
+		r.DrawText(screen, msg, logX, logY+i*lineHeight, color.White)
 	}
 }
 
-func (r *Renderer) drawSystemTab(screen *ebiten.Image, state *model.GameState) {
-	// Clicker Button
-	clickerColor := color.RGBA{0, 255, 0, 255}
-	if state.ClickerFlash {
-		clickerColor = color.RGBA{100, 255, 100, 255}
-	}
-	r.drawRectBorder(screen, ui.ClickerRegion, clickerColor)
-	r.DrawText(screen, "MANUAL OVERRIDE", float64(ui.ClickerRegion.Min.X+30), float64(ui.ClickerRegion.Min.Y+30), r.normalFace, clickerColor)
-
-	// Reboot Button
-	rebootColor := color.RGBA{0, 100, 0, 255}
-	if state.TotalBitsEarned >= 1_000_000 {
-		rebootColor = color.RGBA{0, 255, 0, 255}
-	}
-	r.drawRectBorder(screen, ui.RebootBtnRect, rebootColor)
-	r.DrawText(screen, "SYSTEM_REBOOT", float64(ui.RebootBtnRect.Min.X+ui.RebootBtnRect.Dx()/2-80), float64(ui.RebootBtnRect.Min.Y+12), r.normalFace, rebootColor)
+func (r *Renderer) drawReboot(screen *ebiten.Image, state *model.GameState, neonGreen color.Color) {
+	clr := neonGreen
+	if state.TotalBitsEarned < 1_000_000 { clr = color.RGBA{0, 80, 0, 255} }
+	r.drawRectBorder(screen, ui.RebootBtnRect, clr)
+	r.DrawText(screen, "SYSTEM_REBOOT", ui.RebootBtnRect.Min.X+ui.RebootBtnRect.Dx()/2-80, ui.RebootBtnRect.Min.Y+20, color.White)
 }
 
-func (r *Renderer) drawRebootDialog(screen *ebiten.Image, state *model.GameState) {
-	rect := image.Rect(ui.WidgetX+50, ui.WidgetY+150, ui.WidgetX+ui.WidgetWidth-50, ui.WidgetY+ui.WidgetHeight-150)
-	ebitenutil.DrawRect(screen, float64(rect.Min.X), float64(rect.Min.Y), float64(rect.Dx()), float64(rect.Dy()), color.RGBA{0, 0, 0, 230})
-	r.drawRectBorder(screen, rect, color.RGBA{0, 255, 0, 255})
+func (r *Renderer) drawPacketIntercept(screen *ebiten.Image, state *model.GameState, neonGreen color.Color) {
+	rect := ui.PacketRect
+	clr := neonGreen
+	if (int(state.PacketTimer*10) % 4) < 2 { clr = color.White }
+	ebitenutil.DrawRect(screen, float64(rect.Min.X), float64(rect.Min.Y), float64(rect.Dx()), float64(rect.Dy()), color.RGBA{0, 100, 0, 100})
+	r.drawRectBorder(screen, rect, clr)
+	r.DrawText(screen, ">> PACKET <<", rect.Min.X+10, rect.Min.Y+20, color.White)
+}
 
+func (r *Renderer) drawRebootDialog(screen *ebiten.Image, state *model.GameState, neonGreen color.Color) {
+	rect := image.Rect(ui.WidgetX+100, ui.WidgetY+100, ui.WidgetX+ui.WidgetWidth-100, ui.WidgetY+ui.WidgetHeight-100)
+	ebitenutil.DrawRect(screen, float64(rect.Min.X), float64(rect.Min.Y), float64(rect.Dx()), float64(rect.Dy()), color.Black)
+	r.drawRectBorder(screen, rect, neonGreen)
 	gain := math.Log10(state.TotalBitsEarned/1_000_000) * 0.1
-	if gain < 0 {
-		gain = 0
-	}
-
-	green := color.RGBA{0, 255, 0, 255}
-	r.DrawText(screen, ">> SYSTEM_REBOOT INITIATED <<", float64(rect.Min.X+200), float64(rect.Min.Y+50), r.normalFace, green)
-	r.DrawText(screen, fmt.Sprintf("GHz GAIN: +%.3fX", gain), float64(rect.Min.X+200), float64(rect.Min.Y+100), r.normalFace, green)
-	r.DrawText(screen, "ALL HARDWARE AND BITS WILL BE WIPED.", float64(rect.Min.X+200), float64(rect.Min.Y+150), r.smallFace, green)
-	r.DrawText(screen, "[CONFIRM (Left)]    [ABORT (Right)]", float64(rect.Min.X+200), float64(rect.Min.Y+220), r.normalFace, green)
+	if gain < 0 { gain = 0 }
+	r.DrawText(screen, ">> SYSTEM_REBOOT INITIATED <<", rect.Min.X+150, rect.Min.Y+50, color.White)
+	r.DrawText(screen, fmt.Sprintf("GHz GAIN: +%.3fX", gain), rect.Min.X+150, rect.Min.Y+100, color.White)
+	r.DrawText(screen, "[Y] CONFIRM / [N] ABORT", rect.Min.X+150, rect.Min.Y+200, color.White)
 }
 
 func (r *Renderer) drawRectBorder(screen *ebiten.Image, rect image.Rectangle, clr color.Color) {

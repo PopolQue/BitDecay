@@ -6,7 +6,7 @@ import (
 	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/popolque/firstbitengi/internal/ui"
 )
 
@@ -32,25 +32,17 @@ type WaterfallRenderer struct {
 	columns   []*MatrixColumn
 	tick      int
 	offscreen *ebiten.Image
-	face      *text.GoTextFace
 }
 
 func NewWaterfallRenderer() *WaterfallRenderer {
 	wr := &WaterfallRenderer{
 		offscreen: ebiten.NewImage(ui.ScreenWidth, ui.ScreenHeight),
 	}
-	if ui.MainFaceSource != nil {
-		wr.face = &text.GoTextFace{Source: ui.MainFaceSource, Size: 14}
-	}
 	return wr
 }
 
 func (w *WaterfallRenderer) Update(corruption float64) {
 	w.tick++
-
-	if w.face == nil && ui.MainFaceSource != nil {
-		w.face = &text.GoTextFace{Source: ui.MainFaceSource, Size: 14}
-	}
 
 	// Maintain a fixed number of columns
 	targetCount := 60
@@ -68,17 +60,16 @@ func (w *WaterfallRenderer) Update(corruption float64) {
 		c := w.columns[i]
 		c.Life--
 
-		// Randomly change symbols without re-allocating slice
+		// Randomly change symbols
 		if w.tick%3 == 0 {
 			for j := 0; j < len(c.Symbols); j++ {
-				// Occasionally don't change to save some work/variation
 				if rand.Float64() > 0.2 {
 					c.Symbols[j] = string(charset[rand.Intn(len(charset))])
 				}
 			}
 		}
 
-		// If column life is over, remove it (it will respawn elsewhere)
+		// If column life is over, remove it
 		if c.Life <= 0 {
 			w.columns = append(w.columns[:i], w.columns[i+1:]...)
 		}
@@ -96,20 +87,16 @@ func (w *WaterfallRenderer) spawnColumn(corruption float64) {
 
 func (w *WaterfallRenderer) Draw(screen *ebiten.Image) {
 	w.offscreen.Clear()
-	lineHeight := 14.0
+	lineHeight := 14
 
 	for _, c := range w.columns {
 		for i, sym := range c.Symbols {
-			currY := float64(c.Y) + float64(i)*lineHeight
+			currY := c.Y + i*lineHeight
 
 			// Only draw if not inside the widget rect
-			pt := image.Pt(c.X, int(currY))
-			if !pt.In(ui.WidgetRect) && currY >= 0 && currY < float64(ui.ScreenHeight) {
-				if w.face != nil {
-					op := &text.DrawOptions{}
-					op.GeoM.Translate(float64(c.X), currY)
-					text.Draw(w.offscreen, sym, w.face, op)
-				}
+			pt := image.Pt(c.X, currY)
+			if !pt.In(ui.WidgetRect) && currY >= 0 && currY < ui.ScreenHeight {
+				ebitenutil.DebugPrintAt(w.offscreen, sym, c.X, currY)
 			}
 		}
 	}

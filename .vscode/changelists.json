@@ -3,29 +3,14 @@
     {
       "name": "Default",
       "files": [
-        "cmd/bitdecay/main.go",
-        "cmd/bitdecay/save.json",
-        "go.mod",
-        "go.sum",
-        "internal/audio/audio.go",
-        "internal/engine/game.go",
         "internal/engine/gameengine.go",
         "internal/render/renderer.go",
-        "internal/render/waterfall.go",
         "internal/ui/layout.go",
-        "assets/assets.go",
-        "assets/fonts/BPdotsLight.otf",
-        "assets/sfx/BitDecayClick.wav",
-        "assets/sfx/BitDecayLoop.wav",
-        "internal/ui/font.go",
-        "save.json",
-        "BitDecay.md",
-        "GEMINI.md",
         "internal/model/state.go",
-        "internal/persist/autosave.go",
-        "internal/persist/save.go",
         ".vscode/changelists.json",
-        "ANNOTATED_CODEBASE.md"
+        "cmd/bitdecay/save.json",
+        "internal/render/waterfall.go",
+        "internal/model/hardware_def.go"
       ]
     }
   ],

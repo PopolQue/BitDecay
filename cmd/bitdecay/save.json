@@ -1,18 +1,38 @@
 {
-  "Bits": 1487.3129160074477,
-  "TotalBitsEarned": 3290.879296152261,
+  "Bits": 4308.4139724441675,
+  "TotalBitsEarned": 14810.114781244105,
   "Entropy": 100,
-  "Corruption": 52.791630199998075,
+  "Corruption": 76.2316302000021,
+  "PowerUsage": 0,
+  "PowerCapacity": 0,
+  "HeatLevel": 0,
+  "SpaceUsage": 0,
+  "SpaceCapacity": 60,
   "GHzMultiplier": 1,
   "RebootCount": 0,
   "Hardware": {
-    "alu": 3,
-    "ecc_memory": 1,
-    "logic_gate": 22
+    "alu": 16,
+    "ecc_memory": 4,
+    "heatsink": 1,
+    "logic_gate": 27,
+    "rack_shelf": 15
   },
   "Upgrades": {},
   "ClickerFlash": false,
   "ScrollOffset": 0,
   "RebootPending": false,
-  "ActiveTab": "HARDWARE"
+  "MessageLog": [
+    "[INSTALL] Basic Rack Shelf",
+    "[INSTALL] Basic Rack Shelf",
+    "[INSTALL] Basic Rack Shelf",
+    "[INSTALL] Basic Rack Shelf",
+    "[INSTALL] Basic Rack Shelf",
+    "[INSTALL] Basic Rack Shelf",
+    "[INSTALL] Basic Rack Shelf",
+    "[INSTALL] Basic Rack Shelf",
+    "[INSTALL] Basic Rack Shelf",
+    "[INSTALL] Basic Rack Shelf"
+  ],
+  "PacketActive": true,
+  "PacketTimer": 5.9000000000000075
 }

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"image"
 	"math"
 	"time"
@@ -48,12 +49,12 @@ func (ge *GameEngine) Update(in *input.InputSystem) {
 func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 	if ge.state.RebootPending {
 		if in.Clicked {
-			rect := image.Rect(ui.WidgetX+50, ui.WidgetY+150, ui.WidgetX+ui.WidgetWidth-50, ui.WidgetY+ui.WidgetHeight-150)
+			rect := image.Rect(ui.WidgetX+100, ui.WidgetY+100, ui.WidgetX+ui.WidgetWidth-100, ui.WidgetY+ui.WidgetHeight-100)
 			if in.MousePos.In(rect) {
 				audio.PlayClick()
-				if in.MousePos.X < rect.Min.X+rect.Dx()/2 { // Confirm
+				if in.MousePos.X < rect.Min.X+rect.Dx()/2 {
 					ge.Reboot()
-				} else { // Abort
+				} else {
 					ge.state.RebootPending = false
 				}
 			}
@@ -61,69 +62,51 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 		return
 	}
 
+	if ge.state.PacketActive && in.Clicked && in.MousePos.In(ui.PacketRect) {
+		reward := math.Max(1024, ge.state.Bits*0.1)
+		ge.state.Bits += reward
+		ge.state.TotalBitsEarned += reward
+		ge.state.PacketActive = false
+		ge.state.LogMessage(fmt.Sprintf("[REWARD] PACKET_HARVEST: +%.0f bits", reward))
+		audio.PlayClick()
+		return
+	}
+
 	if in.Clicked {
-		// Tab switching
-		if in.MousePos.In(ui.Tab1Rect) {
-			ge.state.ActiveTab = "HARDWARE"
-			ge.state.ScrollOffset = 0
-			audio.PlayClick()
-		} else if in.MousePos.In(ui.Tab2Rect) {
-			ge.state.ActiveTab = "UPGRADES"
-			ge.state.ScrollOffset = 0
-			audio.PlayClick()
-		} else if in.MousePos.In(ui.Tab3Rect) {
-			ge.state.ActiveTab = "SYSTEM"
-			ge.state.ScrollOffset = 0
-			audio.PlayClick()
+		if in.MousePos.In(ui.ClickerRegion) {
+			ge.PerformManualClick()
 		}
 
-		// Tab-specific logic
-		switch ge.state.ActiveTab {
-		case "HARDWARE":
-			if in.MousePos.In(ui.ListRect) {
-				rowHeight := 60
-				y := in.MousePos.Y - ui.ListRect.Min.Y + ge.state.ScrollOffset
-				idx := y / rowHeight
-				if idx >= 0 && idx < len(model.AllHardware) {
-					ge.PurchaseHardware(model.AllHardware[idx].ID)
-				}
-			}
-		case "UPGRADES":
-			if in.MousePos.In(ui.ListRect) {
-				rowHeight := 60
-				y := in.MousePos.Y - ui.ListRect.Min.Y + ge.state.ScrollOffset
-				idx := y / rowHeight
-				if idx >= 0 && idx < len(model.AllUpgrades) {
-					ge.PurchaseUpgrade(model.AllUpgrades[idx].ID)
-				}
-			}
-		case "SYSTEM":
-			if in.ClickerPressed() {
-				ge.state.Bits += ge.manualClickValue()
-				ge.state.TotalBitsEarned += ge.manualClickValue()
-				ge.state.ClickerFlash = true
-				audio.PlayClick()
-			}
-			if in.RebootTriggered() && ge.state.TotalBitsEarned >= 1_000_000 {
-				ge.state.RebootPending = true
-				audio.PlayClick()
+		if in.MousePos.In(ui.ListRect) {
+			rowHeight := 50
+			y := in.MousePos.Y - ui.ListRect.Min.Y + ge.state.ScrollOffset
+			idx := y / rowHeight
+			if idx >= 0 && idx < len(model.AllHardware) {
+				ge.PurchaseHardware(model.AllHardware[idx].ID)
 			}
 		}
 
-		// Scroll logic (works in both list tabs)
-		if (ge.state.ActiveTab == "HARDWARE" || ge.state.ActiveTab == "UPGRADES") && in.MousePos.In(ui.ListRect) {
+		if in.MousePos.In(ui.RebootBtnRect) && ge.state.TotalBitsEarned >= 1_000_000 {
+			ge.state.RebootPending = true
+			audio.PlayClick()
+		}
+
+		if in.MousePos.In(ui.ListRect) {
 			ge.state.ScrollOffset -= in.ScrollDelta * 20
 			if ge.state.ScrollOffset < 0 {
 				ge.state.ScrollOffset = 0
 			}
 		}
-	} else if in.ClickerPressed() && ge.state.ActiveTab == "SYSTEM" {
-		// Handle Space key for clicker even if not clicking
-		ge.state.Bits += ge.manualClickValue()
-		ge.state.TotalBitsEarned += ge.manualClickValue()
-		ge.state.ClickerFlash = true
-		audio.PlayClick()
+	} else if in.ClickerPressed() {
+		ge.PerformManualClick()
 	}
+}
+
+func (ge *GameEngine) PerformManualClick() {
+	ge.state.Bits += ge.manualClickValue()
+	ge.state.TotalBitsEarned += ge.manualClickValue()
+	ge.state.ClickerFlash = true
+	audio.PlayClick()
 }
 
 func (ge *GameEngine) Reboot() {
@@ -134,7 +117,6 @@ func (ge *GameEngine) Reboot() {
 	ge.state.GHzMultiplier += gain
 	ge.state.RebootCount++
 
-	// Reset state
 	ge.state.Bits = 0
 	ge.state.TotalBitsEarned = 0
 	ge.state.Entropy = 0
@@ -142,6 +124,8 @@ func (ge *GameEngine) Reboot() {
 	ge.state.Hardware = make(map[string]int)
 	ge.state.Upgrades = make(map[string]bool)
 	ge.state.RebootPending = false
+	ge.state.Sanitize() // Re-adds basic rack shelf
+	ge.state.LogMessage(fmt.Sprintf("[SYSTEM] PURGE_COMPLETE: +%.3fX GHz", gain))
 }
 
 func (ge *GameEngine) PurchaseHardware(id string) {
@@ -162,37 +146,30 @@ func (ge *GameEngine) PurchaseHardware(id string) {
 	owned := ge.state.Hardware[id]
 	cost := model.CurrentCost(target, owned)
 
-	if ge.state.Bits >= cost {
-		ge.state.Bits -= cost
-		ge.state.Hardware[id]++
-		audio.PlayClick()
-	}
-}
-
-func (ge *GameEngine) PurchaseUpgrade(id string) {
-	var target model.UpgradeDef
-	found := false
-	for _, u := range model.AllUpgrades {
-		if u.ID == id {
-			target = u
-			found = true
-			break
-		}
-	}
-
-	if !found || ge.state.Upgrades[id] {
+	if ge.state.Bits < cost {
 		return
 	}
 
-	if ge.state.Bits >= target.Cost {
-		ge.state.Bits -= target.Cost
-		ge.state.Upgrades[id] = true
-		audio.PlayClick()
+	// Constraint Check: Space
+	if target.SpaceImpact > 0 && ge.state.SpaceUsage+target.SpaceImpact > ge.state.SpaceCapacity {
+		ge.state.LogMessage("[ERROR] INSUFFICIENT_RACK_SPACE")
+		return
 	}
+
+	// Constraint Check: Power (Allow buying PSUs always, but check consumption for others)
+	if target.WattsImpact > 0 && ge.state.PowerUsage+target.WattsImpact > ge.state.PowerCapacity {
+		ge.state.LogMessage("[ERROR] POWER_OVERLOAD_PREVENTED")
+		return
+	}
+
+	ge.state.Bits -= cost
+	ge.state.Hardware[id]++
+	audio.PlayClick()
+	ge.state.LogMessage(fmt.Sprintf("[INSTALL] %s", target.Name))
 }
 
 func (ge *GameEngine) gameTick(dt float64) {
-	// 1. Calculate Multipliers from Upgrades
+	// 1. Calculate Multipliers
 	prodMult := 1.0
 	entropyMult := 1.0
 	for id, owned := range ge.state.Upgrades {
@@ -210,62 +187,99 @@ func (ge *GameEngine) gameTick(dt float64) {
 		}
 	}
 
-	// 2. Calculate Production
+	// 2. Reset and Recompute Infrastructure Totals
+	ge.state.PowerUsage = 0
+	ge.state.PowerCapacity = 0
+	ge.state.SpaceUsage = 0
+	ge.state.SpaceCapacity = 0
+	
+	totalHeatGen := 0.0
+	totalCooling := 10.0 // Base ambient cooling
 	bps := 0.0
 	entropyDelta := 0.0
 
 	for _, def := range model.AllHardware {
-		count := ge.state.Hardware[def.ID]
+		count := float64(ge.state.Hardware[def.ID])
 		if count > 0 {
-			// Basic production
-			bps += float64(count) * def.BaseBPS * prodMult
-			// Entropy weight
-			entropyDelta += float64(count) * def.EntropyWeight * entropyMult
+			// Bits & Entropy
+			bps += count * def.BaseBPS * prodMult
+			entropyDelta += count * def.EntropyWeight * entropyMult
+
+			// Power
+			if def.WattsImpact > 0 {
+				ge.state.PowerUsage += count * def.WattsImpact
+			} else {
+				ge.state.PowerCapacity += count * math.Abs(def.WattsImpact)
+			}
+
+			// Thermal
+			if def.ThermalImpact > 0 {
+				totalHeatGen += count * def.ThermalImpact
+			} else {
+				totalCooling += count * math.Abs(def.ThermalImpact)
+			}
+
+			// Space
+			if def.SpaceImpact > 0 {
+				ge.state.SpaceUsage += count * def.SpaceImpact
+			} else {
+				ge.state.SpaceCapacity += count * math.Abs(def.SpaceImpact)
+			}
 		}
 	}
 
-	// Apply GHz Multiplier
-	bps *= ge.state.GHzMultiplier
+	// Calculate Heat Level (0-100%)
+	if totalHeatGen > 0 {
+		ge.state.HeatLevel = (totalHeatGen / totalCooling) * 50.0 // 50 is nominal
+	} else {
+		ge.state.HeatLevel = 0
+	}
 
-	// Apply Corruption Penalty
+	// 3. Apply Multipliers & Penalties
+	bps *= ge.state.GHzMultiplier
+	
+	// Thermal Penalty
+	if ge.state.HeatLevel > 80 {
+		thermalPenalty := (ge.state.HeatLevel - 80) / 40.0 // Up to 0.5 at 100%
+		bps *= (1.0 - math.Min(thermalPenalty, 0.5))
+		ge.state.Corruption += (ge.state.HeatLevel - 80) * 0.005 * dt
+	}
+
+	// Power Penalty (if somehow exceeded)
+	if ge.state.PowerUsage > ge.state.PowerCapacity {
+		ge.state.Entropy += 2.0 * dt
+	}
+
+	// Corruption Penalty
 	corruptPenalty := math.Min(ge.state.Corruption/200.0, 0.5)
 	bps *= (1.0 - corruptPenalty)
 
-	// Update Bits
+	// 4. Update Economy
 	earned := bps * dt
 	ge.state.Bits += earned
 	ge.state.TotalBitsEarned += earned
 
-	// 2. Entropy & Corruption
-	ge.state.Entropy += entropyDelta * dt
-	if ge.state.Entropy < 0 {
-		ge.state.Entropy = 0
-	}
-	if ge.state.Entropy > 100 {
-		ge.state.Entropy = 100
-	}
+	// 5. Entropy & Corruption
+	ge.state.Entropy += (entropyDelta + (ge.state.PowerUsage / 1000.0)) * dt
+	if ge.state.Entropy < 0 { ge.state.Entropy = 0 }
+	if ge.state.Entropy > 100 { ge.state.Entropy = 100 }
 
 	if ge.state.Entropy > 50 {
 		corruptDelta := (ge.state.Entropy - 50) * 0.002
 		ge.state.Corruption += corruptDelta * dt
 	}
 
-	// 3. Decay
 	if ge.state.Corruption > 75 {
 		decayRate := ge.state.Bits * (ge.state.Corruption - 75) * 0.0001
 		ge.state.Bits -= decayRate * dt
 	}
 
-	// Clamp and housekeeping
-	if ge.state.Corruption > 100 {
-		ge.state.Corruption = 100
-	}
-	if ge.state.Bits < 0 {
-		ge.state.Bits = 0
-	}
+	// Clamp
+	if ge.state.Corruption > 100 { ge.state.Corruption = 100 }
+	if ge.state.Bits < 0 { ge.state.Bits = 0 }
 
-	// 4. Audio Triggers
-	if ge.state.Corruption > 90 {
+	// 6. Random Events & Audio
+	if ge.state.Corruption > 90 || ge.state.HeatLevel > 95 {
 		ge.alarmTimer += dt
 		if ge.alarmTimer >= 3.0 {
 			audio.PlayAlarm()
@@ -273,6 +287,20 @@ func (ge *GameEngine) gameTick(dt float64) {
 		}
 	} else {
 		ge.alarmTimer = 0
+	}
+
+	if !ge.state.PacketActive {
+		if math.Mod(ge.state.Bits*123.45, 100) < 0.5 {
+			if ge.state.TotalBitsEarned > 1024 {
+				ge.state.PacketActive = true
+				ge.state.PacketTimer = 8.0
+			}
+		}
+	} else {
+		ge.state.PacketTimer -= dt
+		if ge.state.PacketTimer <= 0 {
+			ge.state.PacketActive = false
+		}
 	}
 
 	ge.state.ClickerFlash = false
