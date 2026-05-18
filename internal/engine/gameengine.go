@@ -77,21 +77,33 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 			ge.PerformManualClick()
 		}
 
-		if in.MousePos.In(ui.ListRect) {
-			rowHeight := 50
-			y := in.MousePos.Y - ui.ListRect.Min.Y + ge.state.ScrollOffset
+		// Hardware List Column
+		if in.MousePos.In(ui.HardwareListRect) {
+			rowHeight := 60
+			y := in.MousePos.Y - ui.HardwareListRect.Min.Y + ge.state.ScrollOffset
 			idx := y / rowHeight
 			if idx >= 0 && idx < len(model.AllHardware) {
 				ge.PurchaseHardware(model.AllHardware[idx].ID)
 			}
 		}
 
-		if in.MousePos.In(ui.RebootBtnRect) && ge.state.TotalBitsEarned >= 1_000_000 {
+		// Upgrade List Column
+		if in.MousePos.In(ui.UpgradeListRect) {
+			rowHeight := 60
+			y := in.MousePos.Y - ui.UpgradeListRect.Min.Y + ge.state.ScrollOffset
+			idx := y / rowHeight
+			if idx >= 0 && idx < len(model.AllUpgrades) {
+				ge.PurchaseUpgrade(model.AllUpgrades[idx].ID)
+			}
+		}
+
+		if in.MousePos.In(ui.RebootBtnRect) && ge.state.TotalBitsEarned >= ge.state.GetRebootThreshold() {
 			ge.state.RebootPending = true
 			audio.PlayClick()
 		}
 
-		if in.MousePos.In(ui.ListRect) {
+		// Global scroll for lists
+		if in.MousePos.In(ui.HardwareListRect) || in.MousePos.In(ui.UpgradeListRect) {
 			ge.state.ScrollOffset -= in.ScrollDelta * 20
 			if ge.state.ScrollOffset < 0 {
 				ge.state.ScrollOffset = 0
@@ -110,9 +122,10 @@ func (ge *GameEngine) PerformManualClick() {
 }
 
 func (ge *GameEngine) Reboot() {
-	gain := math.Log10(ge.state.TotalBitsEarned/1_000_000) * 0.1
-	if gain < 0 {
-		gain = 0
+	threshold := ge.state.GetRebootThreshold()
+	gain := math.Log10(ge.state.TotalBitsEarned/threshold+1.0) * 0.1
+	if ge.state.RebootCount == 0 {
+		gain += 0.1 // Base boost for first reboot
 	}
 	ge.state.GHzMultiplier += gain
 	ge.state.RebootCount++
@@ -124,7 +137,7 @@ func (ge *GameEngine) Reboot() {
 	ge.state.Hardware = make(map[string]int)
 	ge.state.Upgrades = make(map[string]bool)
 	ge.state.RebootPending = false
-	ge.state.Sanitize() // Re-adds basic rack shelf
+	ge.state.Sanitize()
 	ge.state.LogMessage(fmt.Sprintf("[SYSTEM] PURGE_COMPLETE: +%.3fX GHz", gain))
 }
 
@@ -150,13 +163,11 @@ func (ge *GameEngine) PurchaseHardware(id string) {
 		return
 	}
 
-	// Constraint Check: Space
 	if target.SpaceImpact > 0 && ge.state.SpaceUsage+target.SpaceImpact > ge.state.SpaceCapacity {
 		ge.state.LogMessage("[ERROR] INSUFFICIENT_RACK_SPACE")
 		return
 	}
 
-	// Constraint Check: Power (Allow buying PSUs always, but check consumption for others)
 	if target.WattsImpact > 0 && ge.state.PowerUsage+target.WattsImpact > ge.state.PowerCapacity {
 		ge.state.LogMessage("[ERROR] POWER_OVERLOAD_PREVENTED")
 		return
@@ -168,10 +179,35 @@ func (ge *GameEngine) PurchaseHardware(id string) {
 	ge.state.LogMessage(fmt.Sprintf("[INSTALL] %s", target.Name))
 }
 
+func (ge *GameEngine) PurchaseUpgrade(id string) {
+	var target model.UpgradeDef
+	found := false
+	for _, u := range model.AllUpgrades {
+		if u.ID == id {
+			target = u
+			found = true
+			break
+		}
+	}
+
+	if !found || ge.state.Upgrades[id] {
+		return
+	}
+
+	if ge.state.Bits >= target.Cost {
+		ge.state.Bits -= target.Cost
+		ge.state.Upgrades[id] = true
+		audio.PlayClick()
+		ge.state.LogMessage(fmt.Sprintf("[OPTIMIZE] %s", target.Name))
+	}
+}
+
 func (ge *GameEngine) gameTick(dt float64) {
-	// 1. Calculate Multipliers
 	prodMult := 1.0
 	entropyMult := 1.0
+	powerEffMult := 1.0
+	coolingEffMult := 1.0
+
 	for id, owned := range ge.state.Upgrades {
 		if owned {
 			for _, u := range model.AllUpgrades {
@@ -181,45 +217,44 @@ func (ge *GameEngine) gameTick(dt float64) {
 						prodMult *= u.Multiplier
 					case model.UpgradeEntropyReduction:
 						entropyMult *= u.Multiplier
+					case model.UpgradePowerEfficiency:
+						powerEffMult *= u.Multiplier
+					case model.UpgradeCoolingEfficiency:
+						coolingEffMult *= u.Multiplier
 					}
 				}
 			}
 		}
 	}
 
-	// 2. Reset and Recompute Infrastructure Totals
 	ge.state.PowerUsage = 0
 	ge.state.PowerCapacity = 0
 	ge.state.SpaceUsage = 0
 	ge.state.SpaceCapacity = 0
 	
 	totalHeatGen := 0.0
-	totalCooling := 10.0 // Base ambient cooling
+	totalCooling := 10.0 * coolingEffMult
 	bps := 0.0
 	entropyDelta := 0.0
 
 	for _, def := range model.AllHardware {
 		count := float64(ge.state.Hardware[def.ID])
 		if count > 0 {
-			// Bits & Entropy
 			bps += count * def.BaseBPS * prodMult
 			entropyDelta += count * def.EntropyWeight * entropyMult
 
-			// Power
 			if def.WattsImpact > 0 {
-				ge.state.PowerUsage += count * def.WattsImpact
+				ge.state.PowerUsage += count * def.WattsImpact * powerEffMult
 			} else {
 				ge.state.PowerCapacity += count * math.Abs(def.WattsImpact)
 			}
 
-			// Thermal
 			if def.ThermalImpact > 0 {
 				totalHeatGen += count * def.ThermalImpact
 			} else {
-				totalCooling += count * math.Abs(def.ThermalImpact)
+				totalCooling += count * math.Abs(def.ThermalImpact) * coolingEffMult
 			}
 
-			// Space
 			if def.SpaceImpact > 0 {
 				ge.state.SpaceUsage += count * def.SpaceImpact
 			} else {
@@ -228,38 +263,31 @@ func (ge *GameEngine) gameTick(dt float64) {
 		}
 	}
 
-	// Calculate Heat Level (0-100%)
 	if totalHeatGen > 0 {
-		ge.state.HeatLevel = (totalHeatGen / totalCooling) * 50.0 // 50 is nominal
+		ge.state.HeatLevel = (totalHeatGen / totalCooling) * 50.0
 	} else {
 		ge.state.HeatLevel = 0
 	}
 
-	// 3. Apply Multipliers & Penalties
 	bps *= ge.state.GHzMultiplier
 	
-	// Thermal Penalty
 	if ge.state.HeatLevel > 80 {
-		thermalPenalty := (ge.state.HeatLevel - 80) / 40.0 // Up to 0.5 at 100%
+		thermalPenalty := (ge.state.HeatLevel - 80) / 40.0
 		bps *= (1.0 - math.Min(thermalPenalty, 0.5))
 		ge.state.Corruption += (ge.state.HeatLevel - 80) * 0.005 * dt
 	}
 
-	// Power Penalty (if somehow exceeded)
 	if ge.state.PowerUsage > ge.state.PowerCapacity {
 		ge.state.Entropy += 2.0 * dt
 	}
 
-	// Corruption Penalty
 	corruptPenalty := math.Min(ge.state.Corruption/200.0, 0.5)
 	bps *= (1.0 - corruptPenalty)
 
-	// 4. Update Economy
 	earned := bps * dt
 	ge.state.Bits += earned
 	ge.state.TotalBitsEarned += earned
 
-	// 5. Entropy & Corruption
 	ge.state.Entropy += (entropyDelta + (ge.state.PowerUsage / 1000.0)) * dt
 	if ge.state.Entropy < 0 { ge.state.Entropy = 0 }
 	if ge.state.Entropy > 100 { ge.state.Entropy = 100 }
@@ -274,11 +302,9 @@ func (ge *GameEngine) gameTick(dt float64) {
 		ge.state.Bits -= decayRate * dt
 	}
 
-	// Clamp
 	if ge.state.Corruption > 100 { ge.state.Corruption = 100 }
 	if ge.state.Bits < 0 { ge.state.Bits = 0 }
 
-	// 6. Random Events & Audio
 	if ge.state.Corruption > 90 || ge.state.HeatLevel > 95 {
 		ge.alarmTimer += dt
 		if ge.alarmTimer >= 3.0 {

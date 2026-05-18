@@ -6,6 +6,8 @@ const (
 	UpgradeClickBoost UpgradeType = iota
 	UpgradeProductionBoost
 	UpgradeEntropyReduction
+	UpgradePowerEfficiency   // Reduces power draw of compute
+	UpgradeCoolingEfficiency // Increases fan/cooling effectiveness
 )
 
 type UpgradeDef struct {
@@ -42,5 +44,38 @@ var AllUpgrades = []UpgradeDef{
 		Type:        UpgradeEntropyReduction,
 		Multiplier:  0.9,
 		Description: "Reduces entropy generation by 10%.",
+	},
+	// Infrastructure Upgrades
+	{
+		ID:          "volt_mod_1",
+		Name:        "Voltage Undervolting",
+		Cost:        5000,
+		Type:        UpgradePowerEfficiency,
+		Multiplier:  0.8,
+		Description: "Reduces CPU/GPU power draw by 20%.",
+	},
+	{
+		ID:          "thermal_paste",
+		Name:        "Liquid Metal Paste",
+		Cost:        8000,
+		Type:        UpgradeCoolingEfficiency,
+		Multiplier:  1.25,
+		Description: "Increases cooling effectiveness by 25%.",
+	},
+	{
+		ID:          "copper_heatsinks",
+		Name:        "Copper Fin Arrays",
+		Cost:        15000,
+		Type:        UpgradeCoolingEfficiency,
+		Multiplier:  1.5,
+		Description: "Increases cooling effectiveness by 50%.",
+	},
+	{
+		ID:          "datacenter_link",
+		Name:        "Backplane Sync",
+		Cost:        50000,
+		Type:        UpgradeProductionBoost,
+		Multiplier:  1.5,
+		Description: "Increases all bit production by 50%.",
 	},
 }

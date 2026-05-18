@@ -1,5 +1,7 @@
 package model
 
+import "math"
+
 type GameState struct {
 	// Economy
 	Bits            float64
@@ -79,4 +81,10 @@ func (gs *GameState) GetRank() string {
 	default:
 		return "OVERSEER"
 	}
+}
+
+func (gs *GameState) GetRebootThreshold() float64 {
+	base := 10000.0
+	scaling := 5.0 // Threshold increases by 5x each reboot
+	return base * math.Pow(scaling, float64(gs.RebootCount))
 }

@@ -24,11 +24,11 @@ type HardwareDef struct {
 var AllHardware = []HardwareDef{
 	// Infrastructure: Tier 1
 	{ID: "rack_shelf", Name: "Basic Rack Shelf", Tier: 1, BaseCost: 50, CostScaling: 1.10, SpaceImpact: -4.0, Description: "Provides 4U of rack space."},
-	{ID: "psu_450", Name: "450W PSU", Tier: 1, BaseCost: 80, CostScaling: 1.15, WattsImpact: -450, ThermalImpact: 10, Description: "Provides 450W of power."},
-	{ID: "fan_80", Name: "80mm Case Fan", Tier: 1, BaseCost: 30, CostScaling: 1.12, WattsImpact: 5, ThermalImpact: -20, Description: "Basic cooling. Consumes 5W."},
+	{ID: "psu_450", Name: "450W PSU", Tier: 1, BaseCost: 50, CostScaling: 1.15, WattsImpact: -450, ThermalImpact: 10, Description: "Provides 450W of power."},
+	{ID: "fan_80", Name: "80mm Case Fan", Tier: 1, BaseCost: 20, CostScaling: 1.12, WattsImpact: 5, ThermalImpact: -20, Description: "Basic cooling. Consumes 5W."},
 
 	// Compute: Tier 1
-	{ID: "cpu_i3", Name: "Dual-Core CPU", Tier: 1, BaseCost: 150, CostScaling: 1.20, BaseBPS: 5.0, WattsImpact: 65, ThermalImpact: 40, SpaceImpact: 1, Description: "Generates bits. High heat."},
+	{ID: "cpu_i3", Name: "Dual-Core CPU", Tier: 1, BaseCost: 100, CostScaling: 1.20, BaseBPS: 10.0, WattsImpact: 65, ThermalImpact: 40, SpaceImpact: 1, Description: "Generates bits. High heat."},
 	{ID: "ram_8", Name: "8GB DDR4 RAM", Tier: 1, BaseCost: 60, CostScaling: 1.15, BaseBPS: 0.5, WattsImpact: 10, ThermalImpact: 5, SpaceImpact: 0, Description: "Low bit gen, but essential for stability."},
 
 	// Infrastructure: Tier 2
