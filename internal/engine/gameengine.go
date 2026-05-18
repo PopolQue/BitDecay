@@ -33,6 +33,7 @@ func NewGameEngine(state *model.GameState) *GameEngine {
 }
 
 func (ge *GameEngine) Update(in *input.InputSystem) {
+	ge.state.AudioTime = audio.CurrentPosition()
 	ge.accumMs += UpdateMs
 	for ge.accumMs >= GameTickMs {
 		ge.accumMs -= GameTickMs
@@ -125,8 +126,31 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 }
 
 func (ge *GameEngine) PerformManualClick() {
-	ge.state.Bits += ge.manualClickValue()
-	ge.state.TotalBitsEarned += ge.manualClickValue()
+	// Rhythm check: 120 BPM = 2 beats per second. 
+	// 32nd notes = 16 hits per second = 0.0625s interval.
+	interval := 0.0625
+	pos := ge.state.AudioTime
+	beatPos := math.Mod(pos, interval)
+	
+	// Tolerance of 25ms for 32nd notes (total window 50ms out of 62.5ms)
+	tolerance := 0.025
+	isHit := beatPos < tolerance || beatPos > (interval-tolerance)
+
+	if isHit {
+		ge.state.Combo++
+		ge.state.ComboMultiplier += 0.1
+		// Log a rhythmic hit occasionally
+		if ge.state.Combo % 32 == 0 {
+			ge.state.LogMessage(fmt.Sprintf("[OVERCLOCK] %d BEAT_STREAK!", ge.state.Combo))
+		}
+	} else {
+		ge.state.Combo = 0
+		ge.state.ComboMultiplier = 1.0
+	}
+
+	val := ge.manualClickValue() * ge.state.ComboMultiplier
+	ge.state.Bits += val
+	ge.state.TotalBitsEarned += val
 	ge.state.ClickerFlash = true
 	audio.PlayClick()
 }

@@ -111,7 +111,6 @@ func (r *Renderer) drawHeader(screen *ebiten.Image) {
 	op.ColorScale.ScaleWithColor(color.RGBA{57, 255, 20, 255})
 	screen.DrawImage(tempImg, op)
 }
-
 func (r *Renderer) drawWidget(screen *ebiten.Image, state *model.GameState) {
 	neonGreen := color.RGBA{57, 255, 20, 255}
 	bgGreen := color.RGBA{0, 20, 0, 240}
@@ -121,6 +120,46 @@ func (r *Renderer) drawWidget(screen *ebiten.Image, state *model.GameState) {
 	r.drawRectBorder(screen, ui.WidgetRect, neonGreen)
 
 	r.drawHUD(screen, state)
+
+	// Rhythm Display beneath interactive area
+	ry := ui.ClickerRegion.Max.Y + 10
+	rx := ui.ClickerRegion.Min.X
+	
+	// 16-Bar Progress (32 seconds at 120 BPM)
+	loopLen := 32.0
+	loopPos := math.Mod(state.AudioTime, loopLen) / loopLen
+	r.DrawText(screen, "SEQ_PROG", rx, ry, color.RGBA{100, 255, 100, 255})
+	r.drawProgressBar(screen, rx + 100, ry+2, 200, 6, loopPos, neonGreen)
+
+	if state.Combo > 0 {
+		r.DrawText(screen, fmt.Sprintf("COMBO: %d (%.1fX)", state.Combo, state.ComboMultiplier), rx, ry+18, neonGreen)
+	} else {
+		r.DrawText(screen, "SYNC_LOST: KEEP_THE_BEAT", rx, ry+18, color.RGBA{200, 0, 0, 255})
+	}
+
+	// 32nd Note Blinking Dot indicator
+	interval := 0.0625
+	beatPos := math.Mod(state.AudioTime, interval)
+	tolerance := 0.006
+	isHit := beatPos < tolerance || beatPos > (interval-tolerance)
+
+	dotX := rx + 105
+	dotY := ry + 36
+	dotSize := 8.0
+	
+	// Base circle/dot background
+	ebitenutil.DrawRect(screen, float64(dotX)-2, float64(dotY)-2, dotSize+4, dotSize+4, color.RGBA{0, 40, 0, 255})
+	
+	if isHit {
+		// Bright blink during hit window
+		ebitenutil.DrawRect(screen, float64(dotX), float64(dotY), dotSize, dotSize, neonGreen)
+		r.DrawText(screen, "HIT_WINDOW", dotX+20, dotY-6, neonGreen)
+	} else {
+		// Dim state
+		ebitenutil.DrawRect(screen, float64(dotX), float64(dotY), dotSize, dotSize, color.RGBA{0, 80, 0, 255})
+	}
+
+	// Hardware and Upgrade headers
 	r.drawHardwareList(screen, state)
 	r.drawUpgradeList(screen, state)
 	r.drawSystemLog(screen, state)
@@ -139,8 +178,8 @@ func (r *Renderer) drawWidget(screen *ebiten.Image, state *model.GameState) {
 func (r *Renderer) drawHUD(screen *ebiten.Image, state *model.GameState) {
 	r.drawRectBorder(screen, ui.MetricsHUDRect, color.RGBA{0, 200, 0, 255})
 	
-	r.DrawText(screen, fmt.Sprintf("BITS: %s", format.FormatBits(state.Bits)), ui.MetricsHUDRect.Min.X+20, ui.MetricsHUDRect.Min.Y+15, color.White)
-	r.DrawText(screen, fmt.Sprintf("TOTAL: %s", format.FormatBits(state.TotalBitsEarned)), ui.MetricsHUDRect.Min.X+20, ui.MetricsHUDRect.Min.Y+40, color.White)
+	r.DrawText(screen, fmt.Sprintf("BITS: %s (%s)", format.FormatBits(state.Bits), format.FormatBytes(state.Bits)), ui.MetricsHUDRect.Min.X+20, ui.MetricsHUDRect.Min.Y+15, color.White)
+	r.DrawText(screen, fmt.Sprintf("TOTAL: %s (%s)", format.FormatBits(state.TotalBitsEarned), format.FormatBytes(state.TotalBitsEarned)), ui.MetricsHUDRect.Min.X+20, ui.MetricsHUDRect.Min.Y+40, color.White)
 	r.DrawText(screen, fmt.Sprintf("RANK: %s", state.GetRank()), ui.MetricsHUDRect.Min.X+20, ui.MetricsHUDRect.Min.Y+65, color.White)
 	r.DrawText(screen, fmt.Sprintf("GHz MULT: %.3fX", state.GHzMultiplier), ui.MetricsHUDRect.Min.X+20, ui.MetricsHUDRect.Min.Y+90, color.White)
 
@@ -280,6 +319,7 @@ func (r *Renderer) drawRebootDialog(screen *ebiten.Image, state *model.GameState
 
 	r.DrawText(screen, ">> SYSTEM_REBOOT INITIATED <<", rect.Min.X+150, rect.Min.Y+50, color.White)
 	r.DrawText(screen, fmt.Sprintf("GHz GAIN: +%.3fX", gain), rect.Min.X+150, rect.Min.Y+100, color.White)
+	r.DrawText(screen, fmt.Sprintf("DATA PURGE: %s (%s)", format.FormatBits(state.TotalBitsEarned), format.FormatBytes(state.TotalBitsEarned)), rect.Min.X+150, rect.Min.Y+150, color.White)
 	r.DrawText(screen, "[Y] CONFIRM / [N] ABORT", rect.Min.X+150, rect.Min.Y+200, color.White)
 }
 

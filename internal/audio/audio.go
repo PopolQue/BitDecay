@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"log"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/audio/wav"
@@ -43,6 +44,13 @@ func StartLoop() {
 	if loopPlayer != nil && !loopPlayer.IsPlaying() {
 		loopPlayer.Play()
 	}
+}
+
+func CurrentPosition() float64 {
+	if loopPlayer == nil {
+		return 0
+	}
+	return float64(loopPlayer.Current()) / float64(time.Second)
 }
 
 func Update() {

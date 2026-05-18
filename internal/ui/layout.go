@@ -27,7 +27,7 @@ var (
 	UpgradeListRect = image.Rect(WidgetX+670, WidgetY+160, WidgetX+WidgetWidth-20, WidgetY+500)
 
 	// Log Rect (Bottom-Left)
-	LogRect = image.Rect(WidgetX+20, WidgetY+320, WidgetX+320, WidgetY+500)
+	LogRect = image.Rect(WidgetX+20, WidgetY+360, WidgetX+320, WidgetY+510)
 
 	// Packet Intercept (Bottom-Centerish, left of Reboot)
 	PacketRect = image.Rect(WidgetX+20, WidgetY+520, WidgetX+320, WidgetY+580)

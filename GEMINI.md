@@ -9,6 +9,7 @@
 - **Shaders:** Kage (Go-like shader language for Ebitengine)
 - **Configuration:** TOML (via `github.com/BurntSushi/toml`)
 - **Persistence:** JSON
+- **Mechanics:** Rhythm-based clicker (120 BPM, 16th note synchronization)
 
 ## Architecture
 The project follows a modular structure (as defined in the Technical Design Document):
