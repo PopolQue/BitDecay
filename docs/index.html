@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BIT-DECAY</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: black;
+            overflow: hidden;
+            touch-action: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #loading {
+            color: #39ff14;
+            font-family: monospace;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">INITIALIZING_CORE...</div>
+    <script src="wasm_exec.js"></script>
+    <script>
+        if (!WebAssembly.instantiateStreaming) {
+            WebAssembly.instantiateStreaming = async (resp, importObject) => {
+                const source = await (await resp).arrayBuffer();
+                return await WebAssembly.instantiate(source, importObject);
+            };
+        }
+
+        const go = new Go();
+        WebAssembly.instantiateStreaming(fetch("bitdecay.wasm"), go.importObject).then((result) => {
+            document.getElementById("loading").style.display = "none";
+            go.run(result.instance);
+        }).catch((err) => {
+            console.error(err);
+            document.getElementById("loading").innerText = "CORE_LOAD_FAILURE: " + err;
+        });
+    </script>
+</body>
+</html>

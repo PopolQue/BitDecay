@@ -22,9 +22,19 @@ func NewInputSystem() *InputSystem {
 }
 
 func (in *InputSystem) Poll() {
+	// Mouse Input
 	mx, my := ebiten.CursorPosition()
 	in.MousePos = image.Pt(mx, my)
 	in.Clicked = inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
+	
+	// Touch Input (Treat first touch as a click)
+	touchIDs := inpututil.AppendJustPressedTouchIDs(nil)
+	if len(touchIDs) > 0 {
+		tx, ty := ebiten.TouchPosition(touchIDs[0])
+		in.MousePos = image.Pt(tx, ty)
+		in.Clicked = true
+	}
+
 	_, wy := ebiten.Wheel()
 	in.ScrollDelta = int(wy)
 	in.RebootPressed = inpututil.IsKeyJustPressed(ebiten.KeyR)
