@@ -1,0 +1,42 @@
+{
+  "Bits": 18111.68362175648,
+  "TotalBitsEarned": 63898.62590542711,
+  "Entropy": 100,
+  "Corruption": 7.454733765203237,
+  "PowerUsage": 1184,
+  "PowerCapacity": 1350,
+  "HeatLevel": 45.47945205479452,
+  "SpaceUsage": 20,
+  "SpaceCapacity": 20,
+  "GHzMultiplier": 1.9754082783865083,
+  "RebootCount": 3,
+  "Hardware": {
+    "cpu_i3": 20,
+    "fan_80": 36,
+    "psu_450": 3,
+    "rack_shelf": 5
+  },
+  "Upgrades": {
+    "logic_opt_1": true,
+    "overclock_1": true,
+    "shielding_1": true,
+    "thermal_paste": true,
+    "volt_mod_1": true
+  },
+  "ClickerFlash": false,
+  "ScrollOffset": 0,
+  "RebootPending": false,
+  "MessageLog": [
+    "[REWARD] PACKET_HARVEST: +1024 bits",
+    "[INSTALL] 80mm Case Fan",
+    "[REWARD] PACKET_HARVEST: +1024 bits",
+    "[INSTALL] 80mm Case Fan",
+    "[INSTALL] 80mm Case Fan",
+    "[INSTALL] 80mm Case Fan",
+    "[INSTALL] 80mm Case Fan",
+    "[INSTALL] 80mm Case Fan",
+    "[INSTALL] 80mm Case Fan"
+  ],
+  "PacketActive": false,
+  "PacketTimer": 1.500000000000012
+}
