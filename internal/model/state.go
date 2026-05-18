@@ -22,6 +22,10 @@ type GameState struct {
 	GHzMultiplier float64
 	RebootCount   int
 
+	// Rhythm (New)
+	Combo           int
+	ComboMultiplier float64
+
 	// Hardware owned
 	Hardware map[string]int
 	Upgrades map[string]bool
@@ -33,10 +37,13 @@ type GameState struct {
 	MessageLog    []string // System log messages
 	PacketActive  bool     // Is a random packet available to intercept?
 	PacketTimer   float64  // Time remaining for the packet
+	AudioTime     float64  // Current time in the music loop
 }
 
 func NewGameState() *GameState {
-	gs := &GameState{}
+	gs := &GameState{
+		ComboMultiplier: 1.0,
+	}
 	gs.Sanitize()
 	return gs
 }
@@ -62,8 +69,8 @@ func (gs *GameState) Sanitize() {
 
 func (gs *GameState) LogMessage(msg string) {
 	gs.MessageLog = append([]string{msg}, gs.MessageLog...)
-	if len(gs.MessageLog) > 9{ // we show only 9 messages because 10 would overlap the LogWidget in the unified UI
-		gs.MessageLog = gs.MessageLog[:9]
+	if len(gs.MessageLog) > 8 { // we show only 8 messages because 9 would overlap the LogWidget in the unified UI
+		gs.MessageLog = gs.MessageLog[:8]
 	}
 }
 

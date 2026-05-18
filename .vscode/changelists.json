@@ -5,10 +5,15 @@
       "files": [
         "internal/model/state.go",
         "cmd/bitdecay/save.json",
-        ".vscode/changelists.json",
         "internal/engine/gameengine.go",
-        "internal/input/input.go",
-        "internal/render/renderer.go"
+        "internal/render/renderer.go",
+        "assets/sfx/BitDecayClick.wav",
+        "assets/sfx/BitDecayLoop.wav",
+        "internal/audio/audio.go",
+        "internal/format/bits.go",
+        ".vscode/changelists.json",
+        "GEMINI.md",
+        "internal/ui/layout.go"
       ]
     }
   ],
