@@ -60,10 +60,11 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 			return
 		}
 		if in.Clicked {
-			rect := image.Rect(ui.WidgetX+100, ui.WidgetY+100, ui.WidgetX+ui.WidgetWidth-100, ui.WidgetY+ui.WidgetHeight-100)
-			if in.MousePos.In(rect) {
+			rect := ui.GetWidgetRect()
+			inner := image.Rect(rect.Min.X+100, rect.Min.Y+100, rect.Max.X-100, rect.Max.Y-100)
+			if in.MousePos.In(inner) {
 				audio.PlayClick()
-				if in.MousePos.X < rect.Min.X+rect.Dx()/2 {
+				if in.MousePos.X < inner.Min.X+inner.Dx()/2 {
 					ge.Reboot()
 				} else {
 					ge.state.RebootPending = false
@@ -73,7 +74,7 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 		return
 	}
 
-	if ge.state.PacketActive && in.Clicked && in.MousePos.In(ui.PacketRect) {
+	if ge.state.PacketActive && in.Clicked && in.MousePos.In(ui.GetPacketRect()) {
 		reward := math.Max(1024, ge.state.Bits*0.1)
 		ge.state.Bits += reward
 		ge.state.TotalBitsEarned += reward
@@ -84,14 +85,15 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 	}
 
 	if in.Clicked {
-		if in.MousePos.In(ui.ClickerRegion) {
+		if in.MousePos.In(ui.GetClickerRect()) {
 			ge.PerformManualClick()
 		}
 
 		// Hardware List Column
-		if in.MousePos.In(ui.HardwareListRect) {
+		hRect := ui.GetHardwareRect()
+		if in.MousePos.In(hRect) {
 			rowHeight := 60
-			y := in.MousePos.Y - ui.HardwareListRect.Min.Y + ge.state.ScrollOffset
+			y := in.MousePos.Y - hRect.Min.Y + ge.state.ScrollOffset
 			idx := y / rowHeight
 			if idx >= 0 && idx < len(model.AllHardware) {
 				ge.PurchaseHardware(model.AllHardware[idx].ID)
@@ -99,9 +101,10 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 		}
 
 		// Upgrade List Column
-		if in.MousePos.In(ui.UpgradeListRect) {
+		uRect := ui.GetUpgradeRect()
+		if in.MousePos.In(uRect) {
 			rowHeight := 60
-			y := in.MousePos.Y - ui.UpgradeListRect.Min.Y + ge.state.ScrollOffset
+			y := in.MousePos.Y - uRect.Min.Y + ge.state.ScrollOffset
 			idx := y / rowHeight
 			if idx >= 0 && idx < len(model.AllUpgrades) {
 				ge.PurchaseUpgrade(model.AllUpgrades[idx].ID)
@@ -109,7 +112,7 @@ func (ge *GameEngine) handleInputs(in *input.InputSystem) {
 		}
 
 		// Global scroll for lists
-		if in.MousePos.In(ui.HardwareListRect) || in.MousePos.In(ui.UpgradeListRect) {
+		if in.MousePos.In(hRect) || in.MousePos.In(uRect) {
 			ge.state.ScrollOffset -= in.ScrollDelta * 20
 			if ge.state.ScrollOffset < 0 {
 				ge.state.ScrollOffset = 0

@@ -24,6 +24,10 @@ func Init() {
 	}
 }
 
+// Resume is a no-op in modern Ebitengine as it handles it internally,
+// but we keep the symbol to avoid breaking engine calls.
+func Resume() {}
+
 func LoadSounds() {
 	var err error
 	clickPlayer, err = loadWAV("sfx/BitDecayClick.wav", false)
@@ -54,8 +58,6 @@ func CurrentPosition() float64 {
 }
 
 func Update() {
-	// If we use NewInfiniteLoop, it will handle looping automatically once Play() is called.
-	// We don't need manual check here if we use NewInfiniteLoop correctly.
 }
 
 func PlayClick() {

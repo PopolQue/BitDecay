@@ -36,11 +36,10 @@ func NewGame() *Game {
 }
 
 func (g *Game) Update() error {
+	audio.Resume()
 	audio.Update()
 	g.input.Poll()
 	g.engine.Update(g.input)
-	// g.uiState.Animate()
-	// g.glitch.Step(g.engine.state.Corruption)
 	return nil
 }
 
@@ -49,5 +48,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) Layout(outsideW, outsideH int) (int, int) {
-	return 1280, 768
+	ui.ScreenWidth = outsideW
+	ui.ScreenHeight = outsideH
+	return outsideW, outsideH
 }

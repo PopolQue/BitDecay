@@ -45,7 +45,7 @@ func (in *InputSystem) Poll() {
 // Hit-testing helpers used by engine
 func (in *InputSystem) ClickerPressed() bool {
 	// Support both mouse click in region and Space key
-	mouseInClicker := in.Clicked && in.MousePos.In(ui.ClickerRegion)
+	mouseInClicker := in.Clicked && in.MousePos.In(ui.GetClickerRect())
 	spacePressed := inpututil.IsKeyJustPressed(ebiten.KeySpace)
 	return mouseInClicker || spacePressed
 }
@@ -55,5 +55,5 @@ func (in *InputSystem) HardwareBuyPressed(rowRect image.Rectangle) bool {
 }
 
 func (in *InputSystem) RebootTriggered() bool {
-	return in.RebootPressed || (in.Clicked && in.MousePos.In(ui.RebootBtnRect))
+	return in.RebootPressed || (in.Clicked && in.MousePos.In(ui.GetRebootRect()))
 }

@@ -44,6 +44,11 @@ func NewWaterfallRenderer() *WaterfallRenderer {
 func (w *WaterfallRenderer) Update(corruption float64) {
 	w.tick++
 
+	// Handle resolution changes for offscreen
+	if w.offscreen.Bounds().Dx() != ui.ScreenWidth || w.offscreen.Bounds().Dy() != ui.ScreenHeight {
+		w.offscreen = ebiten.NewImage(ui.ScreenWidth, ui.ScreenHeight)
+	}
+
 	// Maintain a fixed number of columns
 	targetCount := 60
 	if len(w.columns) < targetCount {
@@ -88,6 +93,7 @@ func (w *WaterfallRenderer) spawnColumn(corruption float64) {
 func (w *WaterfallRenderer) Draw(screen *ebiten.Image) {
 	w.offscreen.Clear()
 	lineHeight := 14
+	wr := ui.GetWidgetRect()
 
 	for _, c := range w.columns {
 		for i, sym := range c.Symbols {
@@ -95,7 +101,7 @@ func (w *WaterfallRenderer) Draw(screen *ebiten.Image) {
 
 			// Only draw if not inside the widget rect
 			pt := image.Pt(c.X, currY)
-			if !pt.In(ui.WidgetRect) && currY >= 0 && currY < ui.ScreenHeight {
+			if !pt.In(wr) && currY >= 0 && currY < ui.ScreenHeight {
 				ebitenutil.DebugPrintAt(w.offscreen, sym, c.X, currY)
 			}
 		}
