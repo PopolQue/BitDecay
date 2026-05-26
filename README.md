@@ -53,6 +53,3 @@ GOOS=windows GOARCH=amd64 go build -o bitdecay.exe ./cmd/bitdecay
 - **Left Click:** Interact with UI, buy hardware, and hit the "Beat".
 - **[Y] / [N]**: Confirm or Abort system reboot.
 - **Scroll Wheel:** Scroll through Hardware and Upgrade lists.
-
-## 📜 License
-This project is licensed under the MIT License - see the LICENSE file for details.
